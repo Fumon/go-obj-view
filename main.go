@@ -132,9 +132,13 @@ func draw() {
 
 func calc_tick() {
 	//Set the uniform
-	angle := float32(glfw.Time() * 4.5) //45 degrees a second
+	move := float32(math.Sin((glfw.Time() * (math.Pi * 2.0)) / 5.0))
+	fmt.Printf("Move: %v\n", move)
+	angle := float32(glfw.Time() * math.Pi/4.0) //45 degrees a second
 	z_axis := []float32{0.0,0.0,1.0}
-	transform := AxisAngleRotation(z_axis, angle)
+	translate := TranslateMat4([]float32{move, 0.0, 0.0})
+	rotation := AxisAngleRotation(z_axis, angle)
+	transform := translate.Product(rotation)
 	transformattrib.UniformMatrix4fv(1, false, transform[:])
 }
 
@@ -255,16 +259,25 @@ func IdMat4() (m *mat4) {
 	return
 }
 
+func (m mat4) String() string {
+	var result string
+	for row := 0; row < 4; row++ {
+		result +=
+		  fmt.Sprintln(m[row], m[row + 4], m[row + 8], m[row + 12])
+	}
+	return result
+}
+
 //Remember, column major and zero indexed
 func (m *mat4) At(row, col int) float32 {
-	return (*m)[4*col + row]
+	return m[4*col + row]
 }
 
 //a * b in written order
-func (a mat4) Product(b mat4) (mv *mat4) {
+func (a *mat4) Product(b *mat4) (mv *mat4) {
 	mv = new(mat4)
 	for col := 0; col < 4; col++ {
-		for row := 0; row < 0; row++ {
+		for row := 0; row < 4; row++ {
 			var sum float32
 			for i := 0; i < 4; i++ {
 				sum += a.At(row, i) * b.At(i, col)
@@ -276,8 +289,16 @@ func (a mat4) Product(b mat4) (mv *mat4) {
 	return
 }
 
+func TranslateMat4(t []float32) (m *mat4) {
+	m = IdMat4()
+	m[12] = t[0]
+	m[13] = t[1]
+	m[14] = t[2]
+	return
+}
+
 func AxisAngleRotation(axis []float32, angle float32) (mv *mat4) {
-	mv = MakeMat4(1.0)
+	mv = IdMat4()
 	c := math.Cos(float64(angle))
 	s := math.Sin(float64(angle))
 	t := 1 - c
@@ -289,24 +310,13 @@ func AxisAngleRotation(axis []float32, angle float32) (mv *mat4) {
 	mv[1] = float32(t * x * y + z * s)
 	mv[2] = float32(t * x * z - y * s)
 
-	mv[3] = float32(0.0)
-
 	mv[4] = float32(t * x * y - z * s)
 	mv[5] = float32(t * y * y + c)
 	mv[6] = float32(t * y * z + x * s)
 
-	mv[7] = float32(0.0)
-
 	mv[8] = float32(t * x * z + y * s)
 	mv[9] = float32(t * y * z - x * s)
 	mv[10] = float32(t * z * z + c)
-
-	mv[11] = float32(0.0)
-
-	mv[12] = float32(0.0)
-	mv[13] = float32(0.0)
-	mv[14] = float32(0.0)
-	mv[15] = float32(1.0)
 
 	return
 }
