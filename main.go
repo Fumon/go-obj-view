@@ -259,6 +259,17 @@ func IdMat4() (m *mat4) {
 	return
 }
 
+func ScaleMat4(s float32) (m *mat4) {
+	m = new(mat4)
+	for i := range m {
+		switch i {
+		case 0, 5, 10, 15: m[i] = s
+		default: m[i] = 0.0
+		}
+	}
+	return
+}
+
 func (m mat4) String() string {
 	var result string
 	for row := 0; row < 4; row++ {
