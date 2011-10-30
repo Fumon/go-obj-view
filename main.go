@@ -35,6 +35,10 @@ func main() {
 	}
 	defer glfw.Terminate()
 
+	//Set some hints for opening the window
+	//No Resize
+	glfw.OpenWindowHint(glfw.WindowNoResize, 1)
+
 	//Open window
 	if err = glfw.OpenWindow(640, 480, 8,8,8,8,0,8, glfw.Windowed);err != nil {
 		fmt.Fprintf(os.Stderr, "Error in openwindow: %v\n", err)
