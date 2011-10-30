@@ -78,14 +78,19 @@ func draw() {
 	program.Use()
 	//Bind the attribute to the array register
 	attrib_loc.EnableArray()
-	//Bind the vertex buffer to the array.
+	//Bind the vertex buffer to the client state array buffer
 	triangle_buffer.Bind(gl.ARRAY_BUFFER)
+
+	//Size of offset is 0
+	offset := uintptr(0)
+
 	//Set up data type of buffer
-	attrib_loc.AttribPointer(
+	attrib_loc.AttribPointerInternal(
 		2, //Cardinality of each datum
+		gl.FLOAT, //Type
 		false, //Do not norm the data
 		0, //No stride
-		&triangle_buffer, //No offset
+		offset, //No offset
 	)
 
 	//Draw from array.
