@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"gl"
 	"github.com/jteeuwen/glfw"
+	"unsafe"
 )
 
 const (
@@ -16,26 +17,32 @@ const (
 
 var (
 	running bool
-	triangle_buffer gl.Buffer
-	color_buffer gl.Buffer
+	poscolor_buffer gl.Buffer
 	program gl.Program
 	attrib_loc gl.AttribLocation
 	colattrib gl.AttribLocation
-	triangle_verts = []float32 {
-		0.0, 0.8,
-		0.8, -0.8,
-		-0.8, -0.8,
+
+	vert_poscolor = []poscol{ //Three Position followed by three color
+		{Position: [3]float32{0.0, 0.8, 0.0}, Color: [3]float32{1.0, 0.0, 0.0}},
+		{Position: [3]float32{0.8, -0.8, 0.0}, Color: [3]float32{0.0, 1.0, 0.0}},
+		{Position: [3]float32{-0.8, -0.8, 0.0}, Color: [3]float32{0.0, 0.0, 1.0}},
 	}
-	vert_colors = []float32 {
-		1.0, 0.0, 0.0, //Top Vert Color
-		0.0, 1.0, 0.0, //Right Vert Color
-		0.0, 0.0, 1.0, //Left Vert Color
-	}
+	sizeofposcol int
+	offsettocolor int
 )
 
+type poscol struct {
+	Position [3]float32
+	Color [3]float32
+}
 
 func main() {
 	var err os.Error
+
+	//Init Types
+	sizeofposcol = int(unsafe.Sizeof(poscol{}))
+	offsettocolor = int(unsafe.Offsetof(poscol{}.Color))
+
 
 	//Init glfw
 	if err = glfw.Init(); err != nil {
@@ -89,34 +96,28 @@ func draw() {
 
 	//Use program
 	program.Use()
-	//Bind the attribute to the array register
+	//Enable both attributes
 	attrib_loc.EnableArray()
 	defer attrib_loc.DisableArray()
-	//Bind the vertex buffer to the client state array buffer
-	triangle_buffer.Bind(gl.ARRAY_BUFFER)
-
-	//Size of offset is 0
-	offset := uintptr(0)
-
-	//Set up data type of buffer
-	attrib_loc.AttribPointerInternal(
-		2, //Cardinality of each datum
-		gl.FLOAT, //Type
-		false, //Do not norm the data
-		0, //No stride
-		offset, //No offset
-	)
-
-	//Bind the colors
 	colattrib.EnableArray()
 	defer colattrib.DisableArray()
-	color_buffer.Bind(gl.ARRAY_BUFFER)
+	//Bind the buffer to the client state array buffer
+	poscolor_buffer.Bind(gl.ARRAY_BUFFER)
+
+	//Now define how to read from the buffer
+	attrib_loc.AttribPointerInternal(
+		3,
+		gl.FLOAT,
+		false,
+		sizeofposcol, //The 3float appears every 6 floats
+		uintptr(0), //0 offset from beginning to start
+	)
 	colattrib.AttribPointerInternal(
 		3,
 		gl.FLOAT,
 		false,
-		0,
-		offset,
+		sizeofposcol,
+		uintptr(offsettocolor), //Offset 3 floats from beginnning
 	)
 
 	//Draw from array.
@@ -135,21 +136,13 @@ func init_resources() (err os.Error) {
 
 func cleanup_resources() {
 	program.Delete()
-	triangle_buffer.Delete()
+	poscolor_buffer.Delete()
 }
 
 func init_vbo() (err os.Error) {
-	//Create the buffer
-	triangle_buffer = gl.GenBuffer()
-	//Bind the buffer to the array buffer register
-	triangle_buffer.Bind(gl.ARRAY_BUFFER)
-	//Inform openGL that the current buffer should read data from the vertex array.
-	gl.BufferData(gl.ARRAY_BUFFER, len(triangle_verts) * 4, triangle_verts, gl.STATIC_DRAW)
-
-	//Create the color buffer
-	color_buffer = gl.GenBuffer()
-	color_buffer.Bind(gl.ARRAY_BUFFER)
-	gl.BufferData(gl.ARRAY_BUFFER, len(vert_colors) * 4, vert_colors, gl.STATIC_DRAW)
+	poscolor_buffer = gl.GenBuffer()
+	poscolor_buffer.Bind(gl.ARRAY_BUFFER)
+	gl.BufferDataCompound(gl.ARRAY_BUFFER, len(vert_poscolor) * sizeofposcol, vert_poscolor, gl.STATIC_DRAW)
 	return
 }
 
@@ -180,7 +173,7 @@ func init_program() (err os.Error) {
 	}
 
 	//Find attribute location
-	if attrib_loc = program.GetAttribLocation("coord2d"); attrib_loc == -1 {
+	if attrib_loc = program.GetAttribLocation("coord3d"); attrib_loc == -1 {
 		fmt.Fprintf(os.Stderr, "Failed to find attribute location %v\n", program.GetInfoLog())
 		program.Delete()
 		err = os.NewError("Attribute not located")
