@@ -133,7 +133,6 @@ func draw() {
 func calc_tick() {
 	//Set the uniform
 	move := float32(math.Sin((glfw.Time() * (math.Pi * 2.0)) / 5.0))
-	fmt.Printf("Move: %v\n", move)
 	angle := float32(glfw.Time() * math.Pi/4.0) //45 degrees a second
 	z_axis := []float32{0.0,0.0,1.0}
 	translate := TranslateMat4([]float32{move, 0.0, 0.0})
