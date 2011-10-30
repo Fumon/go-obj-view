@@ -15,12 +15,19 @@ const (
 var (
 	running bool
 	triangle_buffer gl.Buffer
+	color_buffer gl.Buffer
 	program gl.Program
 	attrib_loc gl.AttribLocation
+	colattrib gl.AttribLocation
 	triangle_verts = []float32 {
 		0.0, 0.8,
 		0.8, -0.8,
 		-0.8, -0.8,
+	}
+	vert_colors = []float32 {
+		1.0, 0.0, 0.0, //Top Vert Color
+		0.0, 1.0, 0.0, //Right Vert Color
+		0.0, 0.0, 1.0, //Left Vert Color
 	}
 )
 
@@ -78,6 +85,7 @@ func draw() {
 	program.Use()
 	//Bind the attribute to the array register
 	attrib_loc.EnableArray()
+	defer attrib_loc.DisableArray()
 	//Bind the vertex buffer to the client state array buffer
 	triangle_buffer.Bind(gl.ARRAY_BUFFER)
 
@@ -91,6 +99,18 @@ func draw() {
 		false, //Do not norm the data
 		0, //No stride
 		offset, //No offset
+	)
+
+	//Bind the colors
+	colattrib.EnableArray()
+	defer colattrib.DisableArray()
+	color_buffer.Bind(gl.ARRAY_BUFFER)
+	colattrib.AttribPointerInternal(
+		3,
+		gl.FLOAT,
+		false,
+		0,
+		offset,
 	)
 
 	//Draw from array.
@@ -119,6 +139,11 @@ func init_vbo() (err os.Error) {
 	triangle_buffer.Bind(gl.ARRAY_BUFFER)
 	//Inform openGL that the current buffer should read data from the vertex array.
 	gl.BufferData(gl.ARRAY_BUFFER, len(triangle_verts) * 4, triangle_verts, gl.STATIC_DRAW)
+
+	//Create the color buffer
+	color_buffer = gl.GenBuffer()
+	color_buffer.Bind(gl.ARRAY_BUFFER)
+	gl.BufferData(gl.ARRAY_BUFFER, len(vert_colors) * 4, vert_colors, gl.STATIC_DRAW)
 	return
 }
 
@@ -151,6 +176,11 @@ func init_program() (err os.Error) {
 	//Find attribute location
 	if attrib_loc = program.GetAttribLocation("coord2d"); attrib_loc == -1 {
 		fmt.Fprintf(os.Stderr, "Failed to find attribute location %v\n", program.GetInfoLog())
+		program.Delete()
+		err = os.NewError("Attribute not located")
+	}
+	if colattrib = program.GetAttribLocation("v_color"); colattrib == -1 {
+		fmt.Fprintf(os.Stderr, "Failed to find color attribute location &v\n", program.GetInfoLog())
 		program.Delete()
 		err = os.NewError("Attribute not located")
 	}
