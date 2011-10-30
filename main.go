@@ -10,6 +10,8 @@ import (
 
 const (
 	Title = "Triangle 01"
+	Width = 800
+	Height = 800
 )
 
 var (
@@ -47,7 +49,7 @@ func main() {
 	glfw.OpenWindowHint(glfw.WindowNoResize, 1)
 
 	//Open window
-	if err = glfw.OpenWindow(640, 480, 8,8,8,8,0,8, glfw.Windowed);err != nil {
+	if err = glfw.OpenWindow(Width, Height, 8,8,8,8,0,8, glfw.Windowed);err != nil {
 		fmt.Fprintf(os.Stderr, "Error in openwindow: %v\n", err)
 		return
 	}
