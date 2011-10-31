@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	Title = "Triangle 01"
+	Title = "Cube 01"
 	Width = 800
 	Height = 800
 )
@@ -19,15 +19,44 @@ const (
 var (
 	running bool
 	poscolor_buffer gl.Buffer
+	cube_ibo gl.Buffer
 	program gl.Program
 	attrib_loc gl.AttribLocation
 	colattrib gl.AttribLocation
 	transformattrib gl.UniformLocation
 
 	vert_poscolor = []poscol{ //Three Position followed by three color
-		{Position: [3]float32{0.0, 0.8, 0.0}, Color: [3]float32{1.0, 0.0, 0.0}},
-		{Position: [3]float32{0.8, -0.8, 0.0}, Color: [3]float32{0.0, 1.0, 0.0}},
-		{Position: [3]float32{-0.8, -0.8, 0.0}, Color: [3]float32{0.0, 0.0, 1.0}},
+		//Front
+		{Position: [3]float32{-1.0, -1.0, 1.0}, Color: [3]float32{1.0, 1.0, 0.0}},
+		{Position: [3]float32{1.0, -1.0, 1.0}, Color: [3]float32{1.0, 0.0, 0.0}},
+		{Position: [3]float32{1.0, 1.0, 1.0}, Color: [3]float32{0.0, 1.0, 0.0}},
+		{Position: [3]float32{-1.0, 1.0, 1.0}, Color: [3]float32{0.0, 0.0, 1.0}},
+		//Back
+		{Position: [3]float32{-1.0, -1.0, -1.0}, Color: [3]float32{1.0, 1.0, 0.0}},
+		{Position: [3]float32{1.0, -1.0, -1.0}, Color: [3]float32{1.0, 0.0, 0.0}},
+		{Position: [3]float32{1.0, 1.0, -1.0}, Color: [3]float32{0.0, 1.0, 0.0}},
+		{Position: [3]float32{-1.0, 1.0, -1.0}, Color: [3]float32{0.0, 0.0, 1.0}},
+	}
+
+	vert_index = []uint16{
+		//front
+		0, 1, 2,
+		2, 3, 0,
+		//top
+		1, 5, 6,
+		6, 2, 1,
+		//back
+		7, 6, 5,
+		5, 4, 7,
+		//bottom
+		4, 0, 3,
+		3, 7, 4,
+		//left
+		4, 5, 1,
+		1, 0, 4,
+		//right
+		3, 2, 6,
+		6, 7, 3,
 	}
 	sizeofposcol int
 	offsettocolor int
@@ -83,6 +112,10 @@ func main() {
 	}
 	defer cleanup_resources()
 
+	//Default identity transform
+	//id := IdMat4()
+	//transformattrib.UniformMatrix4fv(1, false, id[:])
+
 	running = true
 	for running && glfw.WindowParam(glfw.Opened) == 1 {
 		calc_tick()
@@ -96,9 +129,10 @@ func main() {
 }
 
 func draw() {
+	gl.Enable(gl.DEPTH_TEST)
 	//Clear to white
 	gl.ClearColor(1.0, 1.0, 1.0, 1.0)
-	gl.Clear(gl.COLOR_BUFFER_BIT)
+	gl.Clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT)
 
 	//Use program
 	program.Use()
@@ -126,18 +160,25 @@ func draw() {
 		uintptr(offsettocolor), //Offset 3 floats from beginnning
 	)
 
-	//Draw from array.
-	gl.DrawArrays(gl.TRIANGLES, 0, 3)
+	//Index Buffer
+	cube_ibo.Bind(gl.ELEMENT_ARRAY_BUFFER)
+	//
+
+	//Draw
+	gl.DrawElementsInternal(gl.TRIANGLES, len(vert_index), gl.UNSIGNED_SHORT, uintptr(0))
 }
 
 func calc_tick() {
 	//Set the uniform
-	move := float32(math.Sin((glfw.Time() * (math.Pi * 2.0)) / 5.0))
-	angle := float32(glfw.Time() * math.Pi/4.0) //45 degrees a second
-	z_axis := []float32{0.0,0.0,1.0}
-	translate := TranslateMat4([]float32{move, 0.0, 0.0})
-	rotation := AxisAngleRotation(z_axis, angle)
-	transform := translate.Product(rotation)
+	//move := float32(math.Sin((glfw.Time() * (math.Pi * 2.0)) / 5.0))
+	//angle := float32(glfw.Time() * math.Pi/4.0) //45 degrees a second
+	//axis := []float32{1.0, 0.0, 0.0}
+	//translate := TranslateMat4([]float32{move, 0.0, 0.0})
+	//rotation := AxisAngleRotation(axis, angle)
+	//transform := translate.Product(rotation)
+	//transformattrib.UniformMatrix4fv(1, false, transform[:])
+
+	transform := TranslateMat4([]float32{0.0, 0.0, -2.0})
 	transformattrib.UniformMatrix4fv(1, false, transform[:])
 }
 
@@ -160,17 +201,21 @@ func init_vbo() (err os.Error) {
 	poscolor_buffer = gl.GenBuffer()
 	poscolor_buffer.Bind(gl.ARRAY_BUFFER)
 	gl.BufferDataCompound(gl.ARRAY_BUFFER, len(vert_poscolor) * sizeofposcol, vert_poscolor, gl.STATIC_DRAW)
+
+	cube_ibo = gl.GenBuffer()
+	cube_ibo.Bind(gl.ELEMENT_ARRAY_BUFFER)
+	gl.BufferDataCompound(gl.ELEMENT_ARRAY_BUFFER, len(vert_index) * 2, vert_index, gl.STATIC_DRAW)
 	return
 }
 
 func init_program() (err os.Error) {
 	//Make verrtex shader
 	var vs gl.Shader
-	if vs, err = loadshader("triangle.v.glsl", gl.VERTEX_SHADER); err != nil {
+	if vs, err = loadshader("cube.v.glsl", gl.VERTEX_SHADER); err != nil {
 		return
 	}
 	var fs gl.Shader
-	if fs, err = loadshader("triangle.f.glsl", gl.FRAGMENT_SHADER); err != nil {
+	if fs, err = loadshader("cube.f.glsl", gl.FRAGMENT_SHADER); err != nil {
 		return
 	}
 

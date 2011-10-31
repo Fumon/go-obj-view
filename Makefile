@@ -1,6 +1,6 @@
 include $(GOROOT)/src/Make.inc
 
-TARG = triangle
+TARG = cube
 GOFILES = main.go
 
 include $(GOROOT)/src/Make.cmd
