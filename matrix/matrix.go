@@ -88,7 +88,7 @@ func (a *Mat4) ProductV(b []float32) (bp []float32) {
 		for col := 0; col < 4; col++ {
 			sum += a.At(row, col) * b[col]
 		}
-		b[row] = sum
+		bp[row] = sum
 	}
 	return
 }
