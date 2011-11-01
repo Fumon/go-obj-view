@@ -13,11 +13,11 @@ import (
 
 const (
 	Title = "Cube 01"
-	Width = 800
-	Height = 800
 )
 
 var (
+	Width = 800
+	Height = 800
 	running bool
 	poscolor_buffer gl.Buffer
 	cube_ibo gl.Buffer
@@ -74,6 +74,13 @@ type poscol struct {
 	Color [3]float32
 }
 
+func resize_event(width,height int) {
+	Width = width
+	Height = height
+	calculate_projection()
+	gl.Viewport(0, 0, Width, Height)
+}
+
 func main() {
 	var err os.Error
 
@@ -89,9 +96,8 @@ func main() {
 	}
 	defer glfw.Terminate()
 
-	//Set some hints for opening the window
-	//No Resize
-	glfw.OpenWindowHint(glfw.WindowNoResize, 1)
+	//Set a resize handler
+	glfw.SetWindowSizeCallback(resize_event)
 
 	//Open window
 	if err = glfw.OpenWindow(Width, Height, 8,8,8,8,0,8, glfw.Windowed);err != nil {
@@ -181,11 +187,15 @@ func calc_tick() {
 	transformattrib.UniformMatrix4fv(1, false, mvp_tilt[:])
 }
 
+func calculate_projection() {
+	projection = StdProjection( float32(math.Pi/4), float32(0.1), float32(10.0), (float32(Width) / float32(Height) ) )
+}
+
 func init_resources() (err os.Error) {
 	//Calculate the cute transform
 	model = TranslateMat4([]float32{0.0, 0.0, -4.0})
 	view = ViewLookAt([]float32{0.0, 2.0, 0.0}, []float32{0.0, -2.0, -4.0}, []float32{0.0, 1.0, 0.0})
-	projection = StdProjection( float32(math.Pi/4), float32(0.1), float32(10.0), (float32(Width) / float32(Height) ) )
+	calculate_projection()
 	mvp_tilt = projection.Product(view.Product(model))
 	if err = init_vbo(); err != nil {
 		return
