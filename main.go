@@ -61,6 +61,8 @@ var (
 	sizeofposcol int
 	offsettocolor int
 
+	mvp_tilt *Mat4
+
 	//Tick stuff
 	//lasttime float64
 )
@@ -178,11 +180,16 @@ func calc_tick() {
 	//transform := translate.Product(rotation)
 	//transformattrib.UniformMatrix4fv(1, false, transform[:])
 
-	transform := TranslateMat4([]float32{0.0, 0.0, -2.0})
-	transformattrib.UniformMatrix4fv(1, false, transform[:])
+	//transform := TranslateMat4([]float32{0.0, 0.0, -2.0})
+	transformattrib.UniformMatrix4fv(1, false, mvp_tilt[:])
 }
 
 func init_resources() (err os.Error) {
+	//Calculate the cute transform
+	model := TranslateMat4([]float32{0.0, 0.0, -4.0})
+	view := ViewLookAt([]float32{0.0, 2.0, 0.0}, []float32{0.0, 0.0, -4.0}, []float32{0.0, 1.0, 0.0})
+	projection := StdProjection( float32(45.0), float32(0.1), float32(10.0), (float32(Width) / float32(Height) ) )
+	mvp_tilt = projection.Product(view.Product(model))
 	if err = init_vbo(); err != nil {
 		return
 	}

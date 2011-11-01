@@ -6,18 +6,18 @@ import (
 )
 
 //A column major ordered matrix
-type mat4 [16]float32
+type Mat4 [16]float32
 
-func MakeMat4(a float32) (m *mat4) {
-	m = new(mat4)
+func MakeMat4(a float32) (m *Mat4) {
+	m = new(Mat4)
 	for i := range (*m) {
 		(*m)[i] = a
 	}
 	return
 }
 
-func IdMat4() (m *mat4) {
-	m = new(mat4)
+func IdMat4() (m *Mat4) {
+	m = new(Mat4)
 	for i := range m {
 		switch i {
 		case 0, 5, 10, 15: m[i] = 1.0
@@ -27,8 +27,8 @@ func IdMat4() (m *mat4) {
 	return
 }
 
-func ScaleMat4(s float32) (m *mat4) {
-	m = new(mat4)
+func ScaleMat4(s float32) (m *Mat4) {
+	m = new(Mat4)
 	for i := range m {
 		switch i {
 		case 0, 5, 10, 15: m[i] = s
@@ -38,7 +38,7 @@ func ScaleMat4(s float32) (m *mat4) {
 	return
 }
 
-func (m mat4) String() string {
+func (m Mat4) String() string {
 	var result string
 	for row := 0; row < 4; row++ {
 		result +=
@@ -48,14 +48,14 @@ func (m mat4) String() string {
 }
 
 //Remember, column major and zero indexed
-func (m *mat4) At(row, col int) float32 {
+func (m *Mat4) At(row, col int) float32 {
 	return m[4*col + row]
 }
 
 
 
-func (m *mat4) Transpose() (mp *mat4) {
-	mp = new(mat4)
+func (m *Mat4) Transpose() (mp *Mat4) {
+	mp = new(Mat4)
 	for col := 0; col < 4; col++ {
 		for row := 0; row < 4; row++ {
 			mp[col * 4 + row] = m[row * 4 + col]
@@ -65,8 +65,8 @@ func (m *mat4) Transpose() (mp *mat4) {
 }
 
 //a * b in written order
-func (a *mat4) Product(b *mat4) (mv *mat4) {
-	mv = new(mat4)
+func (a *Mat4) Product(b *Mat4) (mv *Mat4) {
+	mv = new(Mat4)
 	for col := 0; col < 4; col++ {
 		for row := 0; row < 4; row++ {
 			var sum float32
@@ -81,7 +81,7 @@ func (a *mat4) Product(b *mat4) (mv *mat4) {
 }
 
 //a * b where by is a 4x1
-func (a *mat4) ProductV(b []float32) (bp []float32) {
+func (a *Mat4) ProductV(b []float32) (bp []float32) {
 	bp = make([]float32, 4)
 	for row := 0; row < 4; row++ {
 		var sum float32
@@ -94,7 +94,7 @@ func (a *mat4) ProductV(b []float32) (bp []float32) {
 }
 
 //Return a translation in homogeneous coordinates
-func TranslateMat4(t []float32) (m *mat4) {
+func TranslateMat4(t []float32) (m *Mat4) {
 	m = IdMat4()
 	m[12] = t[0]
 	m[13] = t[1]
@@ -103,7 +103,7 @@ func TranslateMat4(t []float32) (m *mat4) {
 }
 
 func mag(vec []float32) (mag float32) {
-	mag = float32(math.Sqrt(math.Pow(float64(vec[0]), 2) + math.Pow(float64(vec[1]), 2) + math.Pow(float64(vec[3]), 2)))
+	mag = float32(math.Sqrt(math.Pow(float64(vec[0]), 2) + math.Pow(float64(vec[1]), 2) + math.Pow(float64(vec[2]), 2)))
 	return
 }
 
@@ -115,7 +115,7 @@ func cross(a, b []float32) (*[3]float32) {
 	return cu
 }
 
-func AxisAngleRotation(axis []float32, angle float32) (mv *mat4) {
+func AxisAngleRotation(axis []float32, angle float32) (mv *Mat4) {
 	mv = IdMat4()
 	c := math.Cos(float64(angle))
 	s := math.Sin(float64(angle))
@@ -140,7 +140,7 @@ func AxisAngleRotation(axis []float32, angle float32) (mv *mat4) {
 }
 
 //Return a view matrix for a camera of position pos, view direction direction and up vector up.
-func ViewLookAt(pos, direction, up []float32) (mv *mat4) {
+func ViewLookAt(pos, direction, up []float32) (mv *Mat4) {
 	x := new([3]float32)
 	y := new([3]float32)
 	z := new([3]float32)
@@ -162,7 +162,7 @@ func ViewLookAt(pos, direction, up []float32) (mv *mat4) {
 	y = cross(z[:], x[:])
 
 	//Make Rtranspose
-	RT := mat4{x[0], y[0], z[0], 0, x[1], y[1], z[1], 0, x[2], y[2], z[2], 0, 0, 0, 0, 1}
+	RT := Mat4{x[0], y[0], z[0], 0, x[1], y[1], z[1], 0, x[2], y[2], z[2], 0, 0, 0, 0, 1}
 	t := RT.ProductV([]float32{pos[0], pos[1], pos[2], 1})
 	RT[12] = -t[0]
 	RT[13] = -t[1]
@@ -171,8 +171,8 @@ func ViewLookAt(pos, direction, up []float32) (mv *mat4) {
 	return
 }
 
-func StdProjection(fovy, near, far, ar float32) (m *mat4) {
-	m = new(mat4)
+func StdProjection(fovy, near, far, ar float32) (m *Mat4) {
+	m = new(Mat4)
 	d := float32(1.0/math.Tan(float64(fovy)/2.0))
 
 	m[0] = d/ar
