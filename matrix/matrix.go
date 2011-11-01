@@ -52,6 +52,18 @@ func (m *mat4) At(row, col int) float32 {
 	return m[4*col + row]
 }
 
+
+
+func (m *mat4) Transpose() (mp *mat4) {
+	mp = new(mat4)
+	for col := 0; col < 4; col++ {
+		for row := 0; row < 4; row++ {
+			mp[col * 4 + row] = m[row * 4 + col]
+		}
+	}
+	return
+}
+
 //a * b in written order
 func (a *mat4) Product(b *mat4) (mv *mat4) {
 	mv = new(mat4)
@@ -68,12 +80,39 @@ func (a *mat4) Product(b *mat4) (mv *mat4) {
 	return
 }
 
+//a * b where by is a 4x1
+func (a *mat4) ProductV(b []float32) (bp []float32) {
+	bp = make([]float32, 4)
+	for row := 0; row < 4; row++ {
+		var sum float32
+		for col := 0; col < 4; col++ {
+			sum += a.At(row, col) * b[col]
+		}
+		b[row] = sum
+	}
+	return
+}
+
+//Return a translation in homogeneous coordinates
 func TranslateMat4(t []float32) (m *mat4) {
 	m = IdMat4()
 	m[12] = t[0]
 	m[13] = t[1]
 	m[14] = t[2]
 	return
+}
+
+func mag(vec []float32) (mag float32) {
+	mag = float32(math.Sqrt(math.Pow(float64(vec[0]), 2) + math.Pow(float64(vec[1]), 2) + math.Pow(float64(vec[3]), 2)))
+	return
+}
+
+func cross(a, b []float32) (*[3]float32) {
+	cu := new([3]float32)
+	cu[0] = a[1]*b[2] - a[2]*b[0]
+	cu[1] = a[2]*b[0] - a[0]*b[2]
+	cu[2] = a[0]*b[1] - a[1]*b[0]
+	return cu
 }
 
 func AxisAngleRotation(axis []float32, angle float32) (mv *mat4) {
@@ -98,4 +137,49 @@ func AxisAngleRotation(axis []float32, angle float32) (mv *mat4) {
 	mv[10] = float32(t * z * z + c)
 
 	return
+}
+
+//Return a view matrix for a camera of position pos, view direction direction and up vector up.
+func ViewLookAt(pos, direction, up []float32) (mv *mat4) {
+	x := new([3]float32)
+	y := new([3]float32)
+	z := new([3]float32)
+	//z = negative normed direction
+	m := mag(direction)
+	z[0] = -direction[0]/m
+	z[1] = -direction[1]/m
+	z[2] = -direction[2]/m
+
+	//x = normed direction cross up
+	//cross = (a2*b3 - a3*b2, a3*b1 - a1*b3, a1*b2 - a2*b1)
+	x = cross(direction, up)
+	m = mag(x[:])
+	x[0] = x[0] / m
+	x[1] = x[1] / m
+	x[2] = x[2] / m
+
+	//y = z cross x
+	y = cross(z[:], x[:])
+
+	//Make Rtranspose
+	RT := mat4{x[0], y[0], z[0], 0, x[1], y[1], z[1], 0, x[2], y[2], z[2], 0, 0, 0, 0, 1}
+	t := RT.ProductV([]float32{pos[0], pos[1], pos[2], 1})
+	RT[12] = -t[0]
+	RT[13] = -t[1]
+	RT[14] = -t[2]
+	mv = &RT
+	return
+}
+
+func StdProjection(fovy, near, far, ar float32) (m *mat4) {
+	m = new(mat4)
+	d := float32(1.0/math.Tan(float64(fovy)/2.0))
+
+	m[0] = d/ar
+	m[5] = d
+	m[10] = (near + far) / (near - far)
+	m[11] = -1
+	m[14] = (2 * near * far) / (near - far)
+
+	return m
 }
