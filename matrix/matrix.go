@@ -108,8 +108,9 @@ func mag(vec []float32) (mag float32) {
 }
 
 func cross(a, b []float32) (*[3]float32) {
+	//cross = (a2*b3 - a3*b2, a3*b1 - a1*b3, a1*b2 - a2*b1)
 	cu := new([3]float32)
-	cu[0] = a[1]*b[2] - a[2]*b[0]
+	cu[0] = a[1]*b[2] - a[2]*b[1]
 	cu[1] = a[2]*b[0] - a[0]*b[2]
 	cu[2] = a[0]*b[1] - a[1]*b[0]
 	return cu
@@ -151,7 +152,6 @@ func ViewLookAt(pos, direction, up []float32) (mv *Mat4) {
 	z[2] = -direction[2]/m
 
 	//x = normed direction cross up
-	//cross = (a2*b3 - a3*b2, a3*b1 - a1*b3, a1*b2 - a2*b1)
 	x = cross(direction, up)
 	m = mag(x[:])
 	x[0] = x[0] / m

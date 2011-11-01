@@ -8,6 +8,7 @@ import (
 	"github.com/jteeuwen/glfw"
 	"unsafe"
 	. "./matrix/_obj/glmatrix"
+	"math"
 )
 
 const (
@@ -27,12 +28,12 @@ var (
 
 	vert_poscolor = []poscol{ //Three Position followed by three color
 		//Front
-		{Position: [3]float32{-1.0, -1.0, 1.0}, Color: [3]float32{1.0, 1.0, 0.0}},
+		{Position: [3]float32{-1.0, -1.0, 1.0}, Color: [3]float32{1.0, 1.0, 1.0}},
 		{Position: [3]float32{1.0, -1.0, 1.0}, Color: [3]float32{1.0, 0.0, 0.0}},
 		{Position: [3]float32{1.0, 1.0, 1.0}, Color: [3]float32{0.0, 1.0, 0.0}},
 		{Position: [3]float32{-1.0, 1.0, 1.0}, Color: [3]float32{0.0, 0.0, 1.0}},
 		//Back
-		{Position: [3]float32{-1.0, -1.0, -1.0}, Color: [3]float32{1.0, 1.0, 0.0}},
+		{Position: [3]float32{-1.0, -1.0, -1.0}, Color: [3]float32{1.0, 1.0, 1.0}},
 		{Position: [3]float32{1.0, -1.0, -1.0}, Color: [3]float32{1.0, 0.0, 0.0}},
 		{Position: [3]float32{1.0, 1.0, -1.0}, Color: [3]float32{0.0, 1.0, 0.0}},
 		{Position: [3]float32{-1.0, 1.0, -1.0}, Color: [3]float32{0.0, 0.0, 1.0}},
@@ -61,10 +62,11 @@ var (
 	sizeofposcol int
 	offsettocolor int
 
-	mvp_tilt *Mat4
-
 	//Tick stuff
-	//lasttime float64
+	model *Mat4
+	view *Mat4
+	projection *Mat4
+	mvp_tilt *Mat4
 )
 
 type poscol struct {
@@ -171,24 +173,20 @@ func draw() {
 }
 
 func calc_tick() {
-	//Set the uniform
-	//move := float32(math.Sin((glfw.Time() * (math.Pi * 2.0)) / 5.0))
-	//angle := float32(glfw.Time() * math.Pi/4.0) //45 degrees a second
-	//axis := []float32{1.0, 0.0, 0.0}
-	//translate := TranslateMat4([]float32{move, 0.0, 0.0})
-	//rotation := AxisAngleRotation(axis, angle)
-	//transform := translate.Product(rotation)
-	//transformattrib.UniformMatrix4fv(1, false, transform[:])
+	angle := float32(glfw.Time() * math.Pi/4.0) //45 degrees a second
+	axis := []float32{0.0, 1.0, 0.0}
+	rotation := AxisAngleRotation(axis, angle)
 
-	//transform := TranslateMat4([]float32{0.0, 0.0, -2.0})
+	mvp_tilt = projection.Product(view.Product(model.Product(rotation)))
 	transformattrib.UniformMatrix4fv(1, false, mvp_tilt[:])
 }
 
 func init_resources() (err os.Error) {
 	//Calculate the cute transform
-	model := TranslateMat4([]float32{0.0, 0.0, -4.0})
-	view := ViewLookAt([]float32{0.0, 2.0, 0.0}, []float32{0.0, 0.0, -4.0}, []float32{0.0, 1.0, 0.0})
-	projection := StdProjection( float32(45.0), float32(0.1), float32(10.0), (float32(Width) / float32(Height) ) )
+	model = TranslateMat4([]float32{0.0, 0.0, -4.0})
+	view = ViewLookAt([]float32{0.0, 4.0, 0.0}, []float32{0.0, 0.0, -4.0}, []float32{0.0, -1.0, 0.0})
+	fmt.Println(view)
+	projection = StdProjection( float32(45.0), float32(0.1), float32(10.0), (float32(Width) / float32(Height) ) )
 	mvp_tilt = projection.Product(view.Product(model))
 	if err = init_vbo(); err != nil {
 		return
