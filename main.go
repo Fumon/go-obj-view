@@ -6,61 +6,27 @@ import (
 	"io/ioutil"
 	"gl"
 	"github.com/jteeuwen/glfw"
-	"unsafe"
+	//"unsafe"
 	. "./matrix/_obj/glmatrix"
 	"math"
+	"../obj_import/_obj/obj"
 )
 
 const (
-	Title = "Cube 01"
+	Title = "Monkey!!!!!"
 )
 
 var (
 	Width = 800
 	Height = 800
 	running bool
-	poscolor_buffer gl.Buffer
-	cube_ibo gl.Buffer
+	ibo gl.Buffer //index buffer
+	vbo gl.Buffer
 	program gl.Program
 	attrib_loc gl.AttribLocation
-	colattrib gl.AttribLocation
 	transformattrib gl.UniformLocation
+	monkeyobj *obj.Object
 
-	vert_poscolor = []poscol{ //Three Position followed by three color
-		//Front
-		{Position: [3]float32{-1.0, -1.0, 1.0}, Color: [3]float32{1.0, 1.0, 1.0}},
-		{Position: [3]float32{1.0, -1.0, 1.0}, Color: [3]float32{1.0, 0.0, 0.0}},
-		{Position: [3]float32{1.0, 1.0, 1.0}, Color: [3]float32{0.0, 1.0, 0.0}},
-		{Position: [3]float32{-1.0, 1.0, 1.0}, Color: [3]float32{0.0, 0.0, 1.0}},
-		//Back
-		{Position: [3]float32{-1.0, -1.0, -1.0}, Color: [3]float32{1.0, 1.0, 1.0}},
-		{Position: [3]float32{1.0, -1.0, -1.0}, Color: [3]float32{1.0, 0.0, 0.0}},
-		{Position: [3]float32{1.0, 1.0, -1.0}, Color: [3]float32{0.0, 1.0, 0.0}},
-		{Position: [3]float32{-1.0, 1.0, -1.0}, Color: [3]float32{0.0, 0.0, 1.0}},
-	}
-
-	vert_index = []uint16{
-		//front
-		0, 1, 2,
-		2, 3, 0,
-		//top
-		1, 5, 6,
-		6, 2, 1,
-		//back
-		7, 6, 5,
-		5, 4, 7,
-		//bottom
-		4, 0, 3,
-		3, 7, 4,
-		//left
-		4, 5, 1,
-		1, 0, 4,
-		//right
-		3, 2, 6,
-		6, 7, 3,
-	}
-	sizeofposcol int
-	offsettocolor int
 
 	//Tick stuff
 	model *Mat4
@@ -83,11 +49,6 @@ func resize_event(width,height int) {
 
 func main() {
 	var err os.Error
-
-	//Init Types
-	sizeofposcol = int(unsafe.Sizeof(poscol{}))
-	offsettocolor = int(unsafe.Offsetof(poscol{}.Color))
-
 
 	//Init glfw
 	if err = glfw.Init(); err != nil {
@@ -149,38 +110,28 @@ func draw() {
 	//Enable both attributes
 	attrib_loc.EnableArray()
 	defer attrib_loc.DisableArray()
-	colattrib.EnableArray()
-	defer colattrib.DisableArray()
 	//Bind the buffer to the client state array buffer
-	poscolor_buffer.Bind(gl.ARRAY_BUFFER)
+	vbo.Bind(gl.ARRAY_BUFFER)
 
 	//Now define how to read from the buffer
 	attrib_loc.AttribPointerInternal(
 		3,
 		gl.FLOAT,
 		false,
-		sizeofposcol, //The 3float appears every 6 floats
+		0,
 		uintptr(0), //0 offset from beginning to start
-	)
-	colattrib.AttribPointerInternal(
-		3,
-		gl.FLOAT,
-		false,
-		sizeofposcol,
-		uintptr(offsettocolor), //Offset 3 floats from beginnning
 	)
 
 	//Index Buffer
-	cube_ibo.Bind(gl.ELEMENT_ARRAY_BUFFER)
-	//
+	ibo.Bind(gl.ELEMENT_ARRAY_BUFFER)
 
 	//Draw
-	gl.DrawElementsInternal(gl.TRIANGLES, len(vert_index), gl.UNSIGNED_SHORT, uintptr(0))
+	gl.DrawElementsInternal(gl.TRIANGLES, len(monkeyobj.Geometry.FaceIndicies), gl.UNSIGNED_INT, uintptr(0))
 }
 
 func calc_tick() {
 	angle := float32(glfw.Time() * math.Pi/4.0) //45 degrees a second
-	axis := []float32{0.0, 1.0, 0.0}
+	axis := []float32{0.0, 0.0, 1.0}
 	rotation := AxisAngleRotation(axis, angle)
 
 	mvp_tilt = projection.Product(view.Product(model.Product(rotation)))
@@ -193,10 +144,22 @@ func calculate_projection() {
 
 func init_resources() (err os.Error) {
 	//Calculate the cute transform
-	model = TranslateMat4([]float32{0.0, 0.0, -4.0})
+	model = TranslateMat4([]float32{0.0, 0.0, -4.0}).Product(AxisAngleRotation([]float32{1.0, 0.0, 0.0}, float32(math.Pi/2.0)))
 	view = ViewLookAt([]float32{0.0, 2.0, 0.0}, []float32{0.0, -2.0, -4.0}, []float32{0.0, 1.0, 0.0})
 	calculate_projection()
 	mvp_tilt = projection.Product(view.Product(model))
+
+	//Open and load the monkey
+	file, nerr := ioutil.ReadFile("monkey.obj")
+	err = nerr
+	if err != nil {
+		return
+	}
+	monkeyobj, err = obj.Parse(string(file))
+	if err != nil {
+		return
+	}
+
 	if err = init_vbo(); err != nil {
 		return
 	}
@@ -208,17 +171,16 @@ func init_resources() (err os.Error) {
 
 func cleanup_resources() {
 	program.Delete()
-	poscolor_buffer.Delete()
 }
 
 func init_vbo() (err os.Error) {
-	poscolor_buffer = gl.GenBuffer()
-	poscolor_buffer.Bind(gl.ARRAY_BUFFER)
-	gl.BufferDataCompound(gl.ARRAY_BUFFER, len(vert_poscolor) * sizeofposcol, vert_poscolor, gl.STATIC_DRAW)
+	vbo = gl.GenBuffer()
+	vbo.Bind(gl.ARRAY_BUFFER)
+	gl.BufferDataCompound(gl.ARRAY_BUFFER, len(monkeyobj.Geometry.Verticies) * 3 * 4, monkeyobj.Geometry.Verticies, gl.STATIC_DRAW)
 
-	cube_ibo = gl.GenBuffer()
-	cube_ibo.Bind(gl.ELEMENT_ARRAY_BUFFER)
-	gl.BufferDataCompound(gl.ELEMENT_ARRAY_BUFFER, len(vert_index) * 2, vert_index, gl.STATIC_DRAW)
+	ibo = gl.GenBuffer()
+	ibo.Bind(gl.ELEMENT_ARRAY_BUFFER)
+	gl.BufferDataCompound(gl.ELEMENT_ARRAY_BUFFER, len(monkeyobj.Geometry.FaceIndicies) * 4, monkeyobj.Geometry.FaceIndicies, gl.STATIC_DRAW)
 	return
 }
 
@@ -251,11 +213,6 @@ func init_program() (err os.Error) {
 	//Find attribute location
 	if attrib_loc = program.GetAttribLocation("coord3d"); attrib_loc == -1 {
 		fmt.Fprintf(os.Stderr, "Failed to find attribute location %v\n", program.GetInfoLog())
-		program.Delete()
-		err = os.NewError("Attribute not located")
-	}
-	if colattrib = program.GetAttribLocation("v_color"); colattrib == -1 {
-		fmt.Fprintf(os.Stderr, "Failed to find color attribute location &v\n", program.GetInfoLog())
 		program.Delete()
 		err = os.NewError("Attribute not located")
 	}
