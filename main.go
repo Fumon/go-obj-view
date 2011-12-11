@@ -36,11 +36,6 @@ var (
 	mvp_tilt *Mat4
 )
 
-type poscol struct {
-	Position [3]float32
-	Color [3]float32
-}
-
 func resize_event(width,height int) {
 	Width = width
 	Height = height
