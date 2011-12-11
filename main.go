@@ -30,6 +30,7 @@ var (
 
 	//Tick stuff
 	model *Mat4
+	model_pre_tick *Mat4
 	view *Mat4
 	projection *Mat4
 	mvp_tilt *Mat4
@@ -131,10 +132,10 @@ func draw() {
 
 func calc_tick() {
 	angle := float32(glfw.Time() * math.Pi/4.0) //45 degrees a second
-	axis := []float32{0.0, 0.0, 1.0}
+	axis := []float32{0.0, 1.0, 0.0}
 	rotation := AxisAngleRotation(axis, angle)
 
-	mvp_tilt = projection.Product(view.Product(model.Product(rotation)))
+	mvp_tilt = projection.Product(view.Product(model.Product(rotation.Product(model_pre_tick))))
 	transformattrib.UniformMatrix4fv(1, false, mvp_tilt[:])
 }
 
@@ -144,7 +145,8 @@ func calculate_projection() {
 
 func init_resources() (err os.Error) {
 	//Calculate the cute transform
-	model = TranslateMat4([]float32{0.0, 0.0, -4.0}).Product(AxisAngleRotation([]float32{1.0, 0.0, 0.0}, float32(math.Pi/2.0)))
+	model_pre_tick = AxisAngleRotation([]float32{1.0, 0.0, 0.0}, float32(math.Pi/2.0))
+	model = TranslateMat4([]float32{0.0, 0.0, -4.0})
 	view = ViewLookAt([]float32{0.0, 2.0, 0.0}, []float32{0.0, -2.0, -4.0}, []float32{0.0, 1.0, 0.0})
 	calculate_projection()
 	mvp_tilt = projection.Product(view.Product(model))
