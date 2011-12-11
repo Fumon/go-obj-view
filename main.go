@@ -20,13 +20,16 @@ var (
 	Width = 800
 	Height = 800
 	running bool
-	ibo gl.Buffer //index buffer
-	vbo gl.Buffer
-	program gl.Program
-	attrib_loc gl.AttribLocation
-	transformattrib gl.UniformLocation
-	monkeyobj *obj.Object
+	//ibo gl.Buffer //index buffer
+	vbo gl.Buffer //vertex buffer
+	//nbo gl.Buffer //normals buffer
+	//uvbo gl.Buffer //UVs buffer
 
+	program gl.Program
+	attrib_obj_coord gl.AttribLocation
+	attrib_obj_normal gl.AttribLocation
+	transformattrib gl.UniformLocation
+	monkeymodel *filemodel
 
 	//Tick stuff
 	model *Mat4
@@ -35,6 +38,25 @@ var (
 	projection *Mat4
 	mvp_tilt *Mat4
 )
+
+//Type to store verticies and normals
+type vertnorm struct {
+	Vert obj.GeomVertex
+	Norm obj.VertexNormal
+}
+
+type filemodel struct {
+	Geometry []vertnorm
+	VertexCount uint
+}
+
+func (f *filemodel) String() string {
+	s := fmt.Sprintf("Filemodel with %v Verticies\n", f.VertexCount)
+	for i, g := range f.Geometry {
+		s = fmt.Sprintf("%vV %v: %v\n", s, i, g)
+	}
+	return s
+}
 
 func resize_event(width,height int) {
 	Width = width
@@ -104,25 +126,35 @@ func draw() {
 	//Use program
 	program.Use()
 	//Enable both attributes
-	attrib_loc.EnableArray()
-	defer attrib_loc.DisableArray()
+	attrib_obj_coord.EnableArray()
+	defer attrib_obj_coord.DisableArray()
 	//Bind the buffer to the client state array buffer
 	vbo.Bind(gl.ARRAY_BUFFER)
 
 	//Now define how to read from the buffer
-	attrib_loc.AttribPointerInternal(
+	attrib_obj_coord.AttribPointerInternal(
 		3,
 		gl.FLOAT,
 		false,
-		0,
+		4*3*2,
 		uintptr(0), //0 offset from beginning to start
 	)
 
+	attrib_obj_normal.AttribPointerInternal(
+		3,
+		gl.FLOAT,
+		false,
+		4*3*2,
+		uintptr(4*3),
+	)
+
 	//Index Buffer
-	ibo.Bind(gl.ELEMENT_ARRAY_BUFFER)
+	//ibo.Bind(gl.ELEMENT_ARRAY_BUFFER)
 
 	//Draw
-	gl.DrawElementsInternal(gl.TRIANGLES, len(monkeyobj.Geometry.FaceIndicies), gl.UNSIGNED_INT, uintptr(0))
+	//gl.DrawElementsInternal(gl.TRIANGLES, len(monkeyobj.Geometry.FaceIndicies), gl.UNSIGNED_INT, uintptr(0))
+
+	gl.DrawArrays(gl.TRIANGLES, 0, int(monkeymodel.VertexCount))
 }
 
 func calc_tick() {
@@ -138,14 +170,8 @@ func calculate_projection() {
 	projection = StdProjection( float32(math.Pi/4), float32(0.1), float32(10.0), (float32(Width) / float32(Height) ) )
 }
 
-func init_resources() (err os.Error) {
-	//Calculate the cute transform
-	model_pre_tick = AxisAngleRotation([]float32{1.0, 0.0, 0.0}, float32(math.Pi/2.0))
-	model = TranslateMat4([]float32{0.0, 0.0, -4.0})
-	view = ViewLookAt([]float32{0.0, 2.0, 0.0}, []float32{0.0, -2.0, -4.0}, []float32{0.0, 1.0, 0.0})
-	calculate_projection()
-	mvp_tilt = projection.Product(view.Product(model))
-
+func load_model() (err os.Error) {
+	var monkeyobj *obj.Object
 	//Open and load the monkey
 	file, nerr := ioutil.ReadFile("monkey.obj")
 	err = nerr
@@ -154,6 +180,38 @@ func init_resources() (err os.Error) {
 	}
 	monkeyobj, err = obj.Parse(string(file))
 	if err != nil {
+		return
+	}
+
+	var unique_vert_count uint
+	if monkeyobj.IsQuads {
+		unique_vert_count = uint(len(monkeyobj.FaceIndicies) * 4)
+	} else {
+		unique_vert_count = uint(len(monkeyobj.FaceIndicies) * 3)
+	}
+
+	//Now make a model
+	m := &filemodel{make([]vertnorm, unique_vert_count), unique_vert_count}
+	//Load in geometry
+	for i, f := range monkeyobj.FaceIndicies {
+		m.Geometry[i].Vert = monkeyobj.Verticies[f[0]]
+		m.Geometry[i].Norm = monkeyobj.Normals[f[2]]
+	}
+
+	monkeymodel = m
+
+	return
+}
+
+func init_resources() (err os.Error) {
+	//Calculate the cute transform
+	model_pre_tick = AxisAngleRotation([]float32{1.0, 0.0, 0.0}, float32(math.Pi/2.0))
+	model = TranslateMat4([]float32{0.0, 0.0, -4.0})
+	view = ViewLookAt([]float32{0.0, 2.0, 0.0}, []float32{0.0, -2.0, -4.0}, []float32{0.0, 1.0, 0.0})
+	calculate_projection()
+	mvp_tilt = projection.Product(view.Product(model))
+
+	if err = load_model(); err != nil {
 		return
 	}
 
@@ -173,11 +231,8 @@ func cleanup_resources() {
 func init_vbo() (err os.Error) {
 	vbo = gl.GenBuffer()
 	vbo.Bind(gl.ARRAY_BUFFER)
-	gl.BufferDataCompound(gl.ARRAY_BUFFER, len(monkeyobj.Geometry.Verticies) * 3 * 4, monkeyobj.Geometry.Verticies, gl.STATIC_DRAW)
+	gl.BufferDataCompound(gl.ARRAY_BUFFER, int(monkeymodel.VertexCount * 3 * 2 * 4), monkeymodel.Geometry, gl.STATIC_DRAW)
 
-	ibo = gl.GenBuffer()
-	ibo.Bind(gl.ELEMENT_ARRAY_BUFFER)
-	gl.BufferDataCompound(gl.ELEMENT_ARRAY_BUFFER, len(monkeyobj.Geometry.FaceIndicies) * 4, monkeyobj.Geometry.FaceIndicies, gl.STATIC_DRAW)
 	return
 }
 
@@ -208,15 +263,23 @@ func init_program() (err os.Error) {
 	}
 
 	//Find attribute location
-	if attrib_loc = program.GetAttribLocation("coord3d"); attrib_loc == -1 {
-		fmt.Fprintf(os.Stderr, "Failed to find attribute location %v\n", program.GetInfoLog())
+	if attrib_obj_coord = program.GetAttribLocation("obj_coord"); attrib_obj_coord == -1 {
+		fmt.Fprintf(os.Stderr, "Failed to find attribute location \"obj_coord\"\n\t%v\n", program.GetInfoLog())
 		program.Delete()
 		err = os.NewError("Attribute not located")
+		return
+	}
+	if attrib_obj_normal = program.GetAttribLocation("obj_normal"); attrib_obj_normal == -1 {
+		fmt.Fprintf(os.Stderr, "Failed to find attribute location \"obj_normal\"\n\t%v\n", program.GetInfoLog())
+		program.Delete()
+		err = os.NewError("Attribute not located")
+		return
 	}
 	if transformattrib = program.GetUniformLocation("m_transform"); transformattrib == -1 {
-		fmt.Fprintf(os.Stderr, "Failed to find transform attribute location %v\n", program.GetInfoLog())
+		fmt.Fprintf(os.Stderr, "Failed to find transform attribute location \"m_transform\"\n\t%v\n", program.GetInfoLog())
 		program.Delete()
 		err = os.NewError("Attribute not located")
+		return
 	}
 
 	return
@@ -237,8 +300,8 @@ func loadshader(filename string, shType gl.GLenum) (sh gl.Shader, err os.Error) 
 	sh.Compile()
 
 	if errint := sh.Get(gl.COMPILE_STATUS); errint == 0 {
-		sh.Delete()
-		fmt.Fprintf(os.Stderr, "Error in compiling %s\n%v",
+		defer sh.Delete()
+		fmt.Fprintf(os.Stderr, "Error in compiling %s\n\t%v\n",
 			filename, sh.GetInfoLog())
 		err = os.NewError("Compile error")
 		return
