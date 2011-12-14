@@ -11,6 +11,7 @@ import (
 	"../obj_import/_obj/obj"
 	. "./matrix/_obj/glmatrix"
 	"math"
+	"flag"
 )
 
 const (
@@ -44,6 +45,9 @@ var (
 	//Custom Datatype Variables
 	vertnormSize int
 	offsetNorm int
+
+	filename = flag.String("file", "monkey.obj", "Sets the model to render")
+	spinrate = flag.Float64("spin", 4.0, "Sets the spin rate as Pi/x radians per second")
 )
 
 //Type to store verticies and normals
@@ -73,6 +77,7 @@ func resize_event(width, height int) {
 }
 
 func main() {
+	flag.Parse()
 	var err error
 
 	//Init types
@@ -172,7 +177,7 @@ func draw() {
 }
 
 func calc_tick() {
-	angle := float32(glfw.Time() * math.Pi / 4.0) //45 degrees a second
+	angle := float32(glfw.Time() * math.Pi / *spinrate)
 	axis := []float32{0.0, 1.0, 0.0}
 	rotation := AxisAngleRotation(axis, angle)
 
@@ -192,7 +197,7 @@ func calculate_projection() {
 func load_model() (err error) {
 	var monkeyobj *obj.Object
 	//Open and load the monkey
-	file, nerr := ioutil.ReadFile("monkey.obj")
+	file, nerr := ioutil.ReadFile(*filename)
 	err = nerr
 	if err != nil {
 		return
