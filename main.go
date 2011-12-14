@@ -1,15 +1,16 @@
 package main
 
 import (
+	"errors"
 	"fmt"
-	"os"
-	"io/ioutil"
-	"gl"
 	"github.com/jteeuwen/glfw"
-	//"unsafe"
+	"gl"
+	"io/ioutil"
+	"os"
+	"unsafe"
+	"../obj_import/_obj/obj"
 	. "./matrix/_obj/glmatrix"
 	"math"
-	"../obj_import/_obj/obj"
 )
 
 const (
@@ -17,26 +18,32 @@ const (
 )
 
 var (
-	Width = 800
-	Height = 800
+	Width   = 800
+	Height  = 800
 	running bool
 	//ibo gl.Buffer //index buffer
 	vbo gl.Buffer //vertex buffer
 	//nbo gl.Buffer //normals buffer
 	//uvbo gl.Buffer //UVs buffer
 
-	program gl.Program
-	attrib_obj_coord gl.AttribLocation
+	program           gl.Program
+	attrib_obj_coord  gl.AttribLocation
 	attrib_obj_normal gl.AttribLocation
-	transformattrib gl.UniformLocation
-	monkeymodel *filemodel
+	transformattrib   gl.UniformLocation
+	it3x3attrib       gl.UniformLocation
+	monkeymodel       *filemodel
+
 
 	//Tick stuff
-	model *Mat4
+	model          *Mat4
 	model_pre_tick *Mat4
-	view *Mat4
-	projection *Mat4
-	mvp_tilt *Mat4
+	view           *Mat4
+	projection     *Mat4
+	mvp_tilt       *Mat4
+
+	//Custom Datatype Variables
+	vertnormSize int
+	offsetNorm int
 )
 
 //Type to store verticies and normals
@@ -46,7 +53,7 @@ type vertnorm struct {
 }
 
 type filemodel struct {
-	Geometry []vertnorm
+	Geometry    []vertnorm
 	VertexCount uint
 }
 
@@ -58,7 +65,7 @@ func (f *filemodel) String() string {
 	return s
 }
 
-func resize_event(width,height int) {
+func resize_event(width, height int) {
 	Width = width
 	Height = height
 	calculate_projection()
@@ -66,7 +73,12 @@ func resize_event(width,height int) {
 }
 
 func main() {
-	var err os.Error
+	var err error
+
+	//Init types
+	vertnormSize = int(unsafe.Sizeof(vertnorm{}))
+	offsetNorm = int(unsafe.Offsetof(vertnorm{}.Norm))
+
 
 	//Init glfw
 	if err = glfw.Init(); err != nil {
@@ -79,7 +91,7 @@ func main() {
 	glfw.SetWindowSizeCallback(resize_event)
 
 	//Open window
-	if err = glfw.OpenWindow(Width, Height, 8,8,8,8,0,8, glfw.Windowed);err != nil {
+	if err = glfw.OpenWindow(Width, Height, 8, 8, 8, 8, 32, 23, glfw.Windowed); err != nil {
 		fmt.Fprintf(os.Stderr, "Error in openwindow: %v\n", err)
 		return
 	}
@@ -120,14 +132,16 @@ func main() {
 func draw() {
 	gl.Enable(gl.DEPTH_TEST)
 	//Clear to white
-	gl.ClearColor(1.0, 1.0, 1.0, 1.0)
-	gl.Clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT)
+	gl.ClearColor(0.1, 0.1, 0.1, 1.0)
+	gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
 	//Use program
 	program.Use()
 	//Enable both attributes
 	attrib_obj_coord.EnableArray()
 	defer attrib_obj_coord.DisableArray()
+	attrib_obj_normal.EnableArray()
+	defer attrib_obj_normal.DisableArray()
 	//Bind the buffer to the client state array buffer
 	vbo.Bind(gl.ARRAY_BUFFER)
 
@@ -136,7 +150,7 @@ func draw() {
 		3,
 		gl.FLOAT,
 		false,
-		4*3*2,
+		vertnormSize,
 		uintptr(0), //0 offset from beginning to start
 	)
 
@@ -144,8 +158,8 @@ func draw() {
 		3,
 		gl.FLOAT,
 		false,
-		4*3*2,
-		uintptr(4*3),
+		vertnormSize,
+		uintptr(offsetNorm),
 	)
 
 	//Index Buffer
@@ -158,19 +172,24 @@ func draw() {
 }
 
 func calc_tick() {
-	angle := float32(glfw.Time() * math.Pi/4.0) //45 degrees a second
+	angle := float32(glfw.Time() * math.Pi / 4.0) //45 degrees a second
 	axis := []float32{0.0, 1.0, 0.0}
 	rotation := AxisAngleRotation(axis, angle)
 
-	mvp_tilt = projection.Product(view.Product(model.Product(rotation.Product(model_pre_tick))))
+	mtmp := model.Product(rotation.Product(model_pre_tick))
+	mt := mtmp.Upper3by3()
+	it3x3Model := mt.Inverse().Transpose()
+
+	mvp_tilt = projection.Product(view.Product(mtmp))
 	transformattrib.UniformMatrix4fv(1, false, mvp_tilt[:])
+	it3x3attrib.UniformMatrix3fv(1, false, it3x3Model[:])
 }
 
 func calculate_projection() {
-	projection = StdProjection( float32(math.Pi/4), float32(0.1), float32(10.0), (float32(Width) / float32(Height) ) )
+	projection = StdProjection(float32(math.Pi/4), float32(0.1), float32(10.0), (float32(Width) / float32(Height)))
 }
 
-func load_model() (err os.Error) {
+func load_model() (err error) {
 	var monkeyobj *obj.Object
 	//Open and load the monkey
 	file, nerr := ioutil.ReadFile("monkey.obj")
@@ -185,9 +204,9 @@ func load_model() (err os.Error) {
 
 	var unique_vert_count uint
 	if monkeyobj.IsQuads {
-		unique_vert_count = uint(len(monkeyobj.FaceIndicies) * 4)
+		unique_vert_count = uint(len(monkeyobj.FaceIndicies))
 	} else {
-		unique_vert_count = uint(len(monkeyobj.FaceIndicies) * 3)
+		unique_vert_count = uint(len(monkeyobj.FaceIndicies))
 	}
 
 	//Now make a model
@@ -203,7 +222,7 @@ func load_model() (err os.Error) {
 	return
 }
 
-func init_resources() (err os.Error) {
+func init_resources() (err error) {
 	//Calculate the cute transform
 	model_pre_tick = AxisAngleRotation([]float32{1.0, 0.0, 0.0}, float32(math.Pi/2.0))
 	model = TranslateMat4([]float32{0.0, 0.0, -4.0})
@@ -228,15 +247,15 @@ func cleanup_resources() {
 	program.Delete()
 }
 
-func init_vbo() (err os.Error) {
+func init_vbo() (err error) {
 	vbo = gl.GenBuffer()
 	vbo.Bind(gl.ARRAY_BUFFER)
-	gl.BufferDataCompound(gl.ARRAY_BUFFER, int(monkeymodel.VertexCount * 3 * 2 * 4), monkeymodel.Geometry, gl.STATIC_DRAW)
+	gl.BufferDataCompound(gl.ARRAY_BUFFER, int(monkeymodel.VertexCount)*vertnormSize, monkeymodel.Geometry, gl.STATIC_DRAW)
 
 	return
 }
 
-func init_program() (err os.Error) {
+func init_program() (err error) {
 	//Make verrtex shader
 	var vs gl.Shader
 	if vs, err = loadshader("cube.v.glsl", gl.VERTEX_SHADER); err != nil {
@@ -258,7 +277,7 @@ func init_program() (err os.Error) {
 	if errInt := program.Get(gl.LINK_STATUS); errInt == 0 {
 		fmt.Fprintf(os.Stderr, "Failed to link: %v\n", program.GetInfoLog())
 		program.Delete()
-		err = os.NewError("Failed to link")
+		err = errors.New("Failed to link")
 		return
 	}
 
@@ -266,26 +285,32 @@ func init_program() (err os.Error) {
 	if attrib_obj_coord = program.GetAttribLocation("obj_coord"); attrib_obj_coord == -1 {
 		fmt.Fprintf(os.Stderr, "Failed to find attribute location \"obj_coord\"\n\t%v\n", program.GetInfoLog())
 		program.Delete()
-		err = os.NewError("Attribute not located")
+		err = errors.New("Attribute not located")
 		return
 	}
 	if attrib_obj_normal = program.GetAttribLocation("obj_normal"); attrib_obj_normal == -1 {
 		fmt.Fprintf(os.Stderr, "Failed to find attribute location \"obj_normal\"\n\t%v\n", program.GetInfoLog())
 		program.Delete()
-		err = os.NewError("Attribute not located")
+		err = errors.New("Attribute not located")
 		return
 	}
 	if transformattrib = program.GetUniformLocation("m_transform"); transformattrib == -1 {
-		fmt.Fprintf(os.Stderr, "Failed to find transform attribute location \"m_transform\"\n\t%v\n", program.GetInfoLog())
+		fmt.Fprintf(os.Stderr, "Failed to find attribute location \"m_transform\"\n\t%v\n", program.GetInfoLog())
 		program.Delete()
-		err = os.NewError("Attribute not located")
+		err = errors.New("Attribute not located")
+		return
+	}
+	if it3x3attrib = program.GetUniformLocation("m_3x3itModel"); it3x3attrib == -1 {
+		fmt.Fprintf(os.Stderr, "Failed to find attribute location \"m_3x3itModel\"\n\t%v\n", program.GetInfoLog())
+		program.Delete()
+		err = errors.New("Attribute not located")
 		return
 	}
 
 	return
 }
 
-func loadshader(filename string, shType gl.GLenum) (sh gl.Shader, err os.Error) {
+func loadshader(filename string, shType gl.GLenum) (sh gl.Shader, err error) {
 	sourcetext, nerr := ioutil.ReadFile(filename)
 	err = nerr
 	if err != nil {
@@ -303,7 +328,7 @@ func loadshader(filename string, shType gl.GLenum) (sh gl.Shader, err os.Error) 
 		defer sh.Delete()
 		fmt.Fprintf(os.Stderr, "Error in compiling %s\n\t%v\n",
 			filename, sh.GetInfoLog())
-		err = os.NewError("Compile error")
+		err = errors.New("Compile error")
 		return
 	}
 	return
