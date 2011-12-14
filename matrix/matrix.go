@@ -7,9 +7,19 @@ import (
 
 //A column major ordered matrix
 type Mat4 [16]float32
+type Mat3 [9]float32
+type Mat2 [4]float32
 
 func MakeMat4(a float32) (m *Mat4) {
 	m = new(Mat4)
+	for i := range (*m) {
+		(*m)[i] = a
+	}
+	return
+}
+
+func MakeMat3(a float32) (m *Mat3) {
+	m = new(Mat3)
 	for i := range (*m) {
 		(*m)[i] = a
 	}
@@ -21,6 +31,17 @@ func IdMat4() (m *Mat4) {
 	for i := range m {
 		switch i {
 		case 0, 5, 10, 15: m[i] = 1.0
+		default: m[i] = 0.0
+		}
+	}
+	return
+}
+
+func IdMat3() (m *Mat3) {
+	m = new(Mat3)
+	for i:= range m {
+		switch i {
+		case 0, 4, 8: m[i] = 1.0
 		default: m[i] = 0.0
 		}
 	}
@@ -47,12 +68,36 @@ func (m Mat4) String() string {
 	return result
 }
 
+func (m Mat3) String() string {
+	var result string
+	for row := 0; row < 3; row++ {
+		result +=
+                  fmt.Sprintln(m[row], m[row + 3], m[row + 6])
+	}
+	return result
+}
+func (m Mat2) String() string {
+	var result string
+	for row := 0; row < 2; row++ {
+		result +=
+                  fmt.Sprintln(m[row], m[row + 2])
+	}
+	return result
+}
+
 //Remember, column major and zero indexed
 func (m *Mat4) At(row, col int) float32 {
 	return m[4*col + row]
 }
 
+func (m *Mat3) At(row, col int) float32 {
+	return m[3*col + row]
+}
 
+func (m *Mat4) Upper3by3() (m3 *Mat3) {
+	m3 = &Mat3{m[0], m[1], m[2], m[4], m[5], m[6], m[8], m[9], m[10]}
+	return
+}
 
 func (m *Mat4) Transpose() (mp *Mat4) {
 	mp = new(Mat4)
@@ -61,6 +106,61 @@ func (m *Mat4) Transpose() (mp *Mat4) {
 			mp[col * 4 + row] = m[row * 4 + col]
 		}
 	}
+	return
+}
+
+func (m *Mat3) Transpose() (mp *Mat3) {
+	mp = new(Mat3)
+	for col := 0; col < 3; col++ {
+		for row := 0; row < 3; row++ {
+			mp[col * 3 + row] = m[row * 3 + col]
+		}
+	}
+	return
+}
+
+func (m *Mat3) Minor(i, j int) (M *Mat2) {
+	M = new(Mat2)
+	Mcount := 0
+	for x := 0; x < 3; x++ {
+		if x != j {
+			for y := 0; y < 3; y++ {
+				if y != i {
+					M[Mcount] = m[x*3 + y]
+					Mcount = Mcount + 1
+				}
+			}
+		}
+	}
+	return
+}
+
+func (m *Mat3) Inverse() (mp *Mat3) {
+	mp = new(Mat3)
+	detinv := (1.0 / m.Determinant())
+	for x := range mp {
+		i, j := x % 3, x / 3
+		sign := float32(1 - ((i+j)%2)*2)
+		minor := m.Minor(i,j)
+		mp[x] = minor.Determinant() * detinv * sign
+	}
+	mp = mp.Transpose()
+	return
+}
+
+func (m *Mat3) Determinant() (det float32) {
+	//0 4 8 - 0 7 5 + 3 7 2 - 3 1 8 + 6 1 5 - 6 4 2
+	det = (m[0]*m[4]*m[8] -
+		m[0]*m[7]*m[5] +
+		m[3]*m[7]*m[2] -
+		m[3]*m[1]*m[8] +
+		m[6]*m[1]*m[5] -
+		m[6]*m[4]*m[2])
+	return
+}
+
+func (m *Mat2) Determinant() (det float32) {
+	det = (m[0]*m[3] - m[2]*m[1])
 	return
 }
 
@@ -80,6 +180,22 @@ func (a *Mat4) Product(b *Mat4) (mv *Mat4) {
 	return
 }
 
+//a * b in written order
+func (a *Mat3) Product(b *Mat3) (mv *Mat3) {
+	mv = new(Mat3)
+	for col := 0; col < 3; col++ {
+		for row := 0; row < 3; row++ {
+			var sum float32
+			for i := 0; i < 3; i++ {
+				sum += a.At(row, i) * b.At(i, col)
+			}
+			mv[col*3 + row] = sum
+		}
+	}
+
+	return
+}
+
 //a * b where by is a 4x1
 func (a *Mat4) ProductV(b []float32) (bp []float32) {
 	bp = make([]float32, 4)
@@ -89,6 +205,14 @@ func (a *Mat4) ProductV(b []float32) (bp []float32) {
 			sum += a.At(row, col) * b[col]
 		}
 		bp[row] = sum
+	}
+	return
+}
+
+func (a *Mat3) ProductF(b float32) (ap *Mat3) {
+	ap = new(Mat3)
+	for i, ae := range a {
+		ap[i] = ae * b
 	}
 	return
 }
