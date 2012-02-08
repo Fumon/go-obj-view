@@ -20,7 +20,7 @@ const (
 
 var (
 	Width   = 800
-	Height  = 800
+	Height  = 600
 	running bool
 	//ibo gl.Buffer //index buffer
 	vbo gl.Buffer //vertex buffer
