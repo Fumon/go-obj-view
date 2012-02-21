@@ -2,16 +2,16 @@ package main
 
 import (
 	"errors"
+	"flag"
 	"fmt"
+	"github.com/banthar/Go-OpenGL/gl"
 	"github.com/jteeuwen/glfw"
-	"gl"
+	. "glmatrix"
 	"io/ioutil"
+	"math"
+	"obj"
 	"os"
 	"unsafe"
-	"../obj_import/_obj/obj"
-	. "./matrix/_obj/glmatrix"
-	"math"
-	"flag"
 )
 
 const (
@@ -34,7 +34,6 @@ var (
 	it3x3attrib       gl.UniformLocation
 	monkeymodel       *filemodel
 
-
 	//Tick stuff
 	model          *Mat4
 	model_pre_tick *Mat4
@@ -44,7 +43,7 @@ var (
 
 	//Custom Datatype Variables
 	vertnormSize int
-	offsetNorm int
+	offsetNorm   int
 
 	filename = flag.String("file", "monkey.obj", "Sets the model to render")
 	spinrate = flag.Float64("spin", 4.0, "Sets the spin rate as Pi/x radians per second")
@@ -83,7 +82,6 @@ func main() {
 	//Init types
 	vertnormSize = int(unsafe.Sizeof(vertnorm{}))
 	offsetNorm = int(unsafe.Offsetof(vertnorm{}.Norm))
-
 
 	//Init glfw
 	if err = glfw.Init(); err != nil {
@@ -174,6 +172,14 @@ func draw() {
 	//gl.DrawElementsInternal(gl.TRIANGLES, len(monkeyobj.Geometry.FaceIndicies), gl.UNSIGNED_INT, uintptr(0))
 
 	gl.DrawArrays(gl.TRIANGLES, 0, int(monkeymodel.VertexCount))
+
+	//Normals
+	gl.Begin(gl.LINES)
+	for _, t := range monkeymodel.Geometry {
+		gl.Vertex3d(t.Vert[0], t.Vert[1], t.Vert[2])
+		gl.Vertex3d(t.Vert[0]+t.Norm[0], t.Vert[1]+t.Norm[1], t.Vert[2]+t.Norm[2])
+	}
+	gl.End()
 }
 
 func calc_tick() {
