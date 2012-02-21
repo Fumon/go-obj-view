@@ -4,7 +4,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/banthar/Go-OpenGL/gl"
+	gl "github.com/chsc/gogl/gl33"
 	"github.com/jteeuwen/glfw"
 	. "glmatrix"
 	"io/ioutil"
@@ -27,7 +27,7 @@ var (
 	//nbo gl.Buffer //normals buffer
 	//uvbo gl.Buffer //UVs buffer
 
-	program           gl.Program
+	program           gl.Uint
 	attrib_obj_coord  gl.AttribLocation
 	attrib_obj_normal gl.AttribLocation
 	transformattrib   gl.UniformLocation
@@ -139,7 +139,7 @@ func draw() {
 	gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
 	//Use program
-	program.Use()
+	gl.UseProgram(program)
 	//Enable both attributes
 	attrib_obj_coord.EnableArray()
 	defer attrib_obj_coord.DisableArray()
@@ -255,7 +255,7 @@ func init_resources() (err error) {
 }
 
 func cleanup_resources() {
-	program.Delete()
+	gl.DeleteProgram(program)
 }
 
 func init_vbo() (err error) {
@@ -280,13 +280,17 @@ func init_program() (err error) {
 	//Init Program
 	program = gl.CreateProgram()
 	//Attach shaders to program before linking
-	program.AttachShader(vs)
-	program.AttachShader(fs)
+	gl.AttachShader(program, vs)
+	gl.AttachShader(program, fs)
 	//Link program
-	program.Link()
+	gl.LinkProgram(program)
 	//Check
-	if errInt := program.Get(gl.LINK_STATUS); errInt == 0 {
-		fmt.Fprintf(os.Stderr, "Failed to link: %v\n", program.GetInfoLog())
+
+	var errInt gl.Int
+	gl.GetProgramiv(program, gl.LINK_STATUS, &errInt)
+
+	if errInt == 0 {
+		fmt.Fprintf(os.Stderr, "Failed to link: %v\n", program)
 		program.Delete()
 		err = errors.New("Failed to link")
 		return
