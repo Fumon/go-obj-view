@@ -4,6 +4,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	
 	gl "github.com/chsc/gogl/gl33"
 	"github.com/jteeuwen/glfw"
 	. "glmatrix"
@@ -23,16 +24,19 @@ var (
 	Height  = 600
 	running bool
 	//ibo gl.Buffer //index buffer
-	vbo gl.Buffer //vertex buffer
+	vbo Buffer //vertex buffer
+	nbo Buffer //Normals 
 	//nbo gl.Buffer //normals buffer
 	//uvbo gl.Buffer //UVs buffer
 
-	program           gl.Uint
-	attrib_obj_coord  gl.AttribLocation
-	attrib_obj_normal gl.AttribLocation
-	transformattrib   gl.UniformLocation
-	it3x3attrib       gl.UniformLocation
+	program           Program
+	lineprogram     Program
+	attrib_obj_coord  AttribLocation
+	attrib_obj_normal AttribLocation
+	transformattrib   UniformLocation
+	it3x3attrib       UniformLocation
 	monkeymodel       *filemodel
+	monkeynorms       []obj.GeomVertex
 
 	//Tick stuff
 	model          *Mat4
@@ -43,6 +47,7 @@ var (
 
 	//Custom Datatype Variables
 	vertnormSize int
+	geomvertexsize int
 	offsetNorm   int
 
 	filename = flag.String("file", "monkey.obj", "Sets the model to render")
@@ -72,7 +77,7 @@ func resize_event(width, height int) {
 	Width = width
 	Height = height
 	calculate_projection()
-	gl.Viewport(0, 0, Width, Height)
+	gl.Viewport(0, 0, gl.Sizei(Width), gl.Sizei(Height))
 }
 
 func main() {
@@ -81,6 +86,7 @@ func main() {
 
 	//Init types
 	vertnormSize = int(unsafe.Sizeof(vertnorm{}))
+	geomvertexsize = int(unsafe.Sizeof(obj.GeomVertex{}))
 	offsetNorm = int(unsafe.Offsetof(vertnorm{}.Norm))
 
 	//Init glfw
@@ -104,7 +110,7 @@ func main() {
 	glfw.SetWindowTitle(Title)
 
 	//Init glew
-	if errGL := gl.Init(); errGL != 0 {
+	if errGL := gl.Init(); errGL != nil {
 		fmt.Fprintf(os.Stderr, "Error in glew init\n")
 		return
 	}
@@ -139,12 +145,10 @@ func draw() {
 	gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
 	//Use program
-	gl.UseProgram(program)
+	program.Use()
 	//Enable both attributes
 	attrib_obj_coord.EnableArray()
-	defer attrib_obj_coord.DisableArray()
 	attrib_obj_normal.EnableArray()
-	defer attrib_obj_normal.DisableArray()
 	//Bind the buffer to the client state array buffer
 	vbo.Bind(gl.ARRAY_BUFFER)
 
@@ -171,15 +175,19 @@ func draw() {
 	//Draw
 	//gl.DrawElementsInternal(gl.TRIANGLES, len(monkeyobj.Geometry.FaceIndicies), gl.UNSIGNED_INT, uintptr(0))
 
-	gl.DrawArrays(gl.TRIANGLES, 0, int(monkeymodel.VertexCount))
+	gl.DrawArrays(gl.TRIANGLES, 0, gl.Sizei(monkeymodel.VertexCount))
+
+	attrib_obj_coord.DisableArray()
+	attrib_obj_normal.DisableArray()
+
 
 	//Normals
-	gl.Begin(gl.LINES)
-	for _, t := range monkeymodel.Geometry {
-		gl.Vertex3d(t.Vert[0], t.Vert[1], t.Vert[2])
-		gl.Vertex3d(t.Vert[0]+t.Norm[0], t.Vert[1]+t.Norm[1], t.Vert[2]+t.Norm[2])
-	}
-	gl.End()
+
+	nbo.Bind(gl.ARRAY_BUFFER)
+	attrib_obj_coord.AttribPointerInternal(3, gl.FLOAT, false, 0, uintptr(0))
+	attrib_obj_normal.AttribPointerInternal(3, gl.FLOAT, false, 0, uintptr(0))
+	gl.DrawArrays(gl.LINES, 0, gl.Sizei(len(monkeynorms)))
+
 }
 
 func calc_tick() {
@@ -230,6 +238,14 @@ func load_model() (err error) {
 
 	monkeymodel = m
 
+	monkeynorms = make([]obj.GeomVertex, unique_vert_count * 2)
+	g := 0
+	for _, v := range monkeymodel.Geometry {
+		monkeynorms[g] = v.Vert
+		monkeynorms[g+1] = obj.GeomVertex{v.Vert[0] + v.Norm[0], v.Vert[1] + v.Norm[1], v.Vert[2] + v.Norm[2]}
+		g += 2
+	}
+
 	return
 }
 
@@ -255,41 +271,42 @@ func init_resources() (err error) {
 }
 
 func cleanup_resources() {
-	gl.DeleteProgram(program)
+	program.Delete()
 }
 
 func init_vbo() (err error) {
-	vbo = gl.GenBuffer()
+	vbo = GenBuffer()
 	vbo.Bind(gl.ARRAY_BUFFER)
-	gl.BufferDataCompound(gl.ARRAY_BUFFER, int(monkeymodel.VertexCount)*vertnormSize, monkeymodel.Geometry, gl.STATIC_DRAW)
+	BufferDataCompound(gl.ARRAY_BUFFER, int(monkeymodel.VertexCount)*vertnormSize, monkeymodel.Geometry, gl.STATIC_DRAW)
+
+	nbo = GenBuffer()
+	nbo.Bind(gl.ARRAY_BUFFER)
+	BufferDataCompound(gl.ARRAY_BUFFER, int(len(monkeynorms)) * geomvertexsize, monkeynorms, gl.STATIC_DRAW)
 
 	return
 }
 
 func init_program() (err error) {
 	//Make verrtex shader
-	var vs gl.Shader
+	var vs Shader
 	if vs, err = loadshader("cube.v.glsl", gl.VERTEX_SHADER); err != nil {
 		return
 	}
-	var fs gl.Shader
+	var fs Shader
 	if fs, err = loadshader("cube.f.glsl", gl.FRAGMENT_SHADER); err != nil {
 		return
 	}
 
 	//Init Program
-	program = gl.CreateProgram()
+	program = CreateProgram()
 	//Attach shaders to program before linking
-	gl.AttachShader(program, vs)
-	gl.AttachShader(program, fs)
+	program.AttachShader(vs)
+	program.AttachShader(fs)
 	//Link program
-	gl.LinkProgram(program)
+	program.Link()
+
 	//Check
-
-	var errInt gl.Int
-	gl.GetProgramiv(program, gl.LINK_STATUS, &errInt)
-
-	if errInt == 0 {
+	if errInt := program.Get(gl.LINK_STATUS); errInt == 0 {
 		fmt.Fprintf(os.Stderr, "Failed to link: %v\n", program)
 		program.Delete()
 		err = errors.New("Failed to link")
@@ -325,7 +342,7 @@ func init_program() (err error) {
 	return
 }
 
-func loadshader(filename string, shType gl.GLenum) (sh gl.Shader, err error) {
+func loadshader(filename string, shType gl.Enum) (sh Shader, err error) {
 	sourcetext, nerr := ioutil.ReadFile(filename)
 	err = nerr
 	if err != nil {
@@ -333,7 +350,7 @@ func loadshader(filename string, shType gl.GLenum) (sh gl.Shader, err error) {
 		return
 	}
 
-	sh = gl.CreateShader(shType)
+	sh = CreateShader(shType)
 	//Link source to shader
 	sh.Source(string(sourcetext))
 	//Compile

@@ -18,6 +18,7 @@ package main
 import "C"
 import gl "github.com/chsc/gogl/gl33"
 import "unsafe"
+import "reflect"
 
 type (
 	Object  gl.Uint
@@ -26,21 +27,19 @@ type (
 )
 
 type (
-	AttribLocation gl.Uint
-	UniformLocation gl.Uint
+	AttribLocation int
+	UniformLocation int
 )
-
-func glString(s string) *gl.Char { return (*gl.Char)(C.CString(s)) }
 
 func CreateShader(type_ gl.Enum) Shader {
 	return Shader(gl.CreateShader(type_))
 }
 
-func (shader Shader) Delete() { gl.DeleteShader(shader) }
+func (shader Shader) Delete() { gl.DeleteShader(gl.Uint(shader)) }
 
 func (shader Shader) GetInfoLog() string {
 	var len gl.Int
-	gl.GetShaderiv(gl.Uint(shader), gl.Enum(INFO_LOG_LENGTH), &len)
+	gl.GetShaderiv(gl.Uint(shader), gl.Enum(gl.INFO_LOG_LENGTH), &len)
 
 	log := C.malloc(C.size_t(len + 1))
 	gl.GetShaderInfoLog(gl.Uint(shader), gl.Sizei(len), nil, (*gl.Char)(log))
@@ -52,7 +51,7 @@ func (shader Shader) GetInfoLog() string {
 
 func (shader Shader) GetSource() string {
 	var len gl.Int
-	gl.GetShaderiv(gl.Uint(shader), gl.Enum(SHADER_SOURCE_LENGTH), &len)
+	gl.GetShaderiv(gl.Uint(shader), gl.Enum(gl.SHADER_SOURCE_LENGTH), &len)
 
 	log := C.malloc(C.size_t(len + 1))
 	gl.GetShaderSource(gl.Uint(shader), gl.Sizei(len), nil, (*gl.Char)(log))
@@ -64,8 +63,8 @@ func (shader Shader) GetSource() string {
 
 func (shader Shader) Source(source string) {
 
-	csource := glString(source)
-	defer freeString(csource)
+	csource := gl.GLString(source)
+	defer gl.GLStringFree(csource)
 
 	var one gl.Int = gl.Int(len(source))
 
@@ -93,7 +92,7 @@ func (program Program) AttachShader(shader Shader) {
 
 func (program Program) GetAttachedShaders() []Object {
 	var len gl.Int
-	gl.GetProgramiv(gl.Uint(program), gl.Enum(ACTIVE_UNIFORM_MAX_LENGTH), &len)
+	gl.GetProgramiv(gl.Uint(program), gl.Enum(gl.ACTIVE_UNIFORM_MAX_LENGTH), &len)
 
 	objects := make([]Object, len)
 	gl.GetAttachedShaders(gl.Uint(program), gl.Sizei(len), nil, *((**gl.Uint)(unsafe.Pointer(&objects))))
@@ -111,13 +110,13 @@ func (program Program) TransformFeedbackVaryings(names []string, buffer_mode gl.
 		gl_names := make([]*gl.Char, len(names))
 
 		for i := range names {
-			gl_names[i] = glString(names[i])
+			gl_names[i] = gl.GLString(names[i])
 		}
 
 		gl.TransformFeedbackVaryings(gl.Uint(program), gl.Sizei(len(gl_names)), &gl_names[0], gl.Enum(buffer_mode))
 
 		for _, s := range gl_names {
-			freeString(s)
+			gl.GLStringFree(s)
 		}
 	}
 }
@@ -131,7 +130,7 @@ func (program Program) Use() { gl.UseProgram(gl.Uint(program)) }
 func (program Program) GetInfoLog() string {
 
 	var len gl.Int
-	gl.GetProgramiv(gl.Uint(program), gl.Enum(INFO_LOG_LENGTH), &len)
+	gl.GetProgramiv(gl.Uint(program), gl.Enum(gl.INFO_LOG_LENGTH), &len)
 
 	log := C.malloc(C.size_t(len + 1))
 	gl.GetProgramInfoLog(gl.Uint(program), gl.Sizei(len), nil, (*gl.Char)(log))
@@ -161,24 +160,24 @@ func (program Program) GetUniformfv(location UniformLocation, values []float32) 
 
 func (program Program) GetUniformLocation(name string) UniformLocation {
 
-	cname := glString(name)
-	defer freeString(cname)
+	cname := gl.GLString(name)
+	defer gl.GLStringFree(cname)
 
 	return UniformLocation(gl.GetUniformLocation(gl.Uint(program), cname))
 }
 
 func (program Program) GetAttribLocation(name string) AttribLocation {
 
-	cname := glString(name)
-	defer freeString(cname)
+	cname := gl.GLString(name)
+	defer gl.GLStringFree(cname)
 
 	return AttribLocation(gl.GetAttribLocation(gl.Uint(program), cname))
 }
 
 func (program Program) BindAttribLocation(index AttribLocation, name string) {
 
-	cname := glString(name)
-	defer freeString(cname)
+	cname := gl.GLString(name)
+	defer gl.GLStringFree(cname)
 
 	gl.BindAttribLocation(gl.Uint(program), gl.Uint(index), cname)
 
@@ -222,9 +221,9 @@ func (indx AttribLocation) Attrib4fv(values []float32) {
 	gl.VertexAttrib4fv(gl.Uint(indx), (*gl.Float)(unsafe.Pointer(&values[0])))
 }
 
-func (indx AttribLocation) AttribPointer(size uint, normalized bool, stride int, pointer interface{}) {
-	t, p := GetGLenumType(pointer)
-	gl.VertexAttribPointer(gl.Uint(indx), gl.Int(size), gl.Enum(t), glBool(normalized), gl.Sizei(stride), p)
+//For use when ARRAY_BUFFER is bound to an internal buffer.
+func (indx AttribLocation) AttribPointerInternal(size uint, t gl.Enum, normalized bool, stride int, offset uintptr) {
+	gl.VertexAttribPointer(gl.Uint(indx), gl.Int(size), gl.Enum(t), gl.GLBool(normalized), gl.Sizei(stride), gl.Pointer(offset))
 }
 
 func (indx AttribLocation) EnableArray() {
@@ -337,6 +336,13 @@ func (location UniformLocation) Uniform4iv(v []int32) {
 	//	gl.Uniform4iv(gl.Int(location), (*C.int)(&v[0]));
 }
 
+func (location UniformLocation) UniformMatrix3fv(size int, transpose bool, data []float32) {
+	gl.UniformMatrix3fv(gl.Int(location), gl.Sizei(size), gl.GLBool(transpose), ((*gl.Float)(&data[0])))
+}
+
+func (location UniformLocation) UniformMatrix4fv(size int, transpose bool, data []float32) {
+	gl.UniformMatrix4fv(gl.Int(location), gl.Sizei(size), gl.GLBool(transpose), ((*gl.Float)(&data[0])))
+}
 
  //Buffer Objects
 
@@ -344,7 +350,7 @@ type Buffer Object
 
 // Create single buffer object
 func GenBuffer() Buffer {
-	var b C.GLuint
+	var b gl.Uint
 	gl.GenBuffers(1, &b)
 	return Buffer(b)
 }
@@ -380,22 +386,11 @@ func (buffer Buffer) BindBufferRange(target gl.Enum, index uint, offset int, siz
 	gl.BindBufferRange(gl.Enum(target), gl.Uint(index), gl.Uint(buffer), gl.Intptr(offset), gl.Sizeiptr(size))
 }
 
-// Creates and initializes a buffer object's data store
-func BufferData(target gl.Enum, size int, data interface{}, usage gl.Enum) {
-	_, p := GetGLenumType(data)
-	gl.BufferData(gl.Enum(target), gl.Sizeiptr(size), p, gl.Enum(usage))
-}
-
-//  Update a subset of a buffer object's data store
-func BufferSubData(target gl.Enum, offset int, size int, data interface{}) {
-	_, p := GetGLenumType(data)
-	gl.BufferSubData(gl.Enum(target), gl.Intptr(offset), gl.Sizeiptr(size), p)
-}
-
-// Returns a subset of a buffer object's data store
-func GetBufferSubData(target gl.Enum, offset int, size int, data interface{}) {
-	_, p := GetGLenumType(data)
-	gl.GetBufferSubData(gl.Enum(target), gl.Intptr(offset), gl.Sizeiptr(size), p)
+func BufferDataCompound(target gl.Enum, size int, data interface{}, usage gl.Enum) {
+	rv := reflect.ValueOf(data)
+	et := rv.Index(0)
+	p := unsafe.Pointer(et.UnsafeAddr())
+	gl.BufferData(gl.Enum(target), gl.Sizeiptr(size), gl.Pointer(p), gl.Enum(usage))
 }
 
 //  Map a buffer object's data store
@@ -405,12 +400,13 @@ func MapBuffer(target gl.Enum, access gl.Enum) {
 
 //  Unmap a buffer object's data store
 func UnmapBuffer(target gl.Enum) bool {
-	return goBool(gl.UnmapBuffer(gl.Enum(target)))
+	return gl.GoBool(gl.UnmapBuffer(gl.Enum(target)))
 }
 
 // Return buffer pointer
 func glGetBufferPointerv(target gl.Enum, pname gl.Enum, params []unsafe.Pointer) {
-	gl.GetBufferPointerv(gl.Enum(target), gl.Enum(pname), &params[0])
+	ptr := gl.Pointer(params[0])
+	gl.GetBufferPointerv(gl.Enum(target), gl.Enum(pname), &ptr)
 }
 
 // Return parameters of a buffer object
