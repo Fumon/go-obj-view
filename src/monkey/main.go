@@ -22,33 +22,35 @@ const (
 var (
 	Width   = 800
 	Height  = 600
-	running bool
+	running 		bool
+	normalson		bool
 	//ibo gl.Buffer //index buffer
-	vbo Buffer //vertex buffer
-	nbo Buffer //Normals 
+	vbo 			Buffer //vertex buffer
+	nbo 			Buffer //Normals 
 	//nbo gl.Buffer //normals buffer
 	//uvbo gl.Buffer //UVs buffer
 
-	program           Program
+	program           	Program
 	
-	attrib_obj_coord  AttribLocation
-	attrib_obj_normal AttribLocation
-	transformattrib   UniformLocation
-	it3x3attrib       UniformLocation
+	attrib_obj_coord  	AttribLocation
+	attrib_obj_normal 	AttribLocation
+	transformattrib   	UniformLocation
+	it3x3attrib       	UniformLocation
+	inv_view         		UniformLocation
 
-	lineprogram     Program
-	line_obj_coord AttribLocation
-	line_transform UniformLocation
+	lineprogram     	Program
+	line_obj_coord 	AttribLocation
+	line_transform 	UniformLocation
 
-	monkeymodel       *filemodel
-	monkeynorms       []obj.GeomVertex
+	monkeymodel       	*filemodel
+	monkeynorms       	[]obj.GeomVertex
 
 	//Tick stuff
-	model          *Mat4
-	model_pre_tick *Mat4
-	view           *Mat4
-	projection     *Mat4
-	mvp_tilt       *Mat4
+	model          		*Mat4
+	model_pre_tick 	*Mat4
+	view           		*Mat4
+	projection     		*Mat4
+	mvp_tilt       		*Mat4
 
 	//Custom Datatype Variables
 	vertnormSize int
@@ -139,6 +141,8 @@ func main() {
 		if glfw.Key('Q') == glfw.KeyPress {
 			running = false
 			break
+		}else if (glfw.Key('N') == glfw.KeyPress) {
+			normalson = !normalson
 		}
 	}
 }
@@ -194,11 +198,7 @@ func draw() {
 	gl.ClearColor(0.1, 0.1, 0.1, 1.0)
 	gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
-	//gl.Enablei(gl.BLEND, 1)
-	//gl.BlendFunc(gl.ONE, gl.ONE)
-	//gl.BlendEquation(0x8006)
-
-	drawnormals()
+	if(normalson) {drawnormals() }
 	drawmonkey()
 	//Normals
 	
@@ -217,6 +217,7 @@ func calc_tick() {
 	program.Use()
 	transformattrib.UniformMatrix4fv(1, false, mvp_tilt[:])
 	it3x3attrib.UniformMatrix3fv(1, false, it3x3Model[:])
+	inv_view.UniformMatrix4fv(1, false, view.Inverse()[:])
 	lineprogram.Use()
 	line_transform.UniformMatrix4fv(1, false, mvp_tilt[:])
 }
@@ -352,6 +353,12 @@ func init_program() (err error) {
 	}
 	if it3x3attrib = program.GetUniformLocation("m_3x3itModel"); it3x3attrib == -1 {
 		fmt.Fprintf(os.Stderr, "Failed to find attribute location \"m_3x3itModel\"\n\t%v\n", program.GetInfoLog())
+		program.Delete()
+		err = errors.New("Attribute not located")
+		return
+	}
+	if inv_view = program.GetUniformLocation("m_inv_view"); inv_view == -1 {
+		fmt.Fprintf(os.Stderr, "Failed to find attribute location \"m_inv_view\"\n\t%v\n", program.GetInfoLog())
 		program.Delete()
 		err = errors.New("Attribute not located")
 		return
