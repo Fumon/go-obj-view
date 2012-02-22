@@ -30,11 +30,16 @@ var (
 	//uvbo gl.Buffer //UVs buffer
 
 	program           Program
-	lineprogram     Program
+	
 	attrib_obj_coord  AttribLocation
 	attrib_obj_normal AttribLocation
 	transformattrib   UniformLocation
 	it3x3attrib       UniformLocation
+
+	lineprogram     Program
+	line_obj_coord AttribLocation
+	line_transform UniformLocation
+
 	monkeymodel       *filemodel
 	monkeynorms       []obj.GeomVertex
 
@@ -138,12 +143,7 @@ func main() {
 	}
 }
 
-func draw() {
-	gl.Enable(gl.DEPTH_TEST)
-	//Clear to white
-	gl.ClearColor(0.1, 0.1, 0.1, 1.0)
-	gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
-
+func drawmonkey() {
 	//Use program
 	program.Use()
 	//Enable both attributes
@@ -176,18 +176,32 @@ func draw() {
 	//gl.DrawElementsInternal(gl.TRIANGLES, len(monkeyobj.Geometry.FaceIndicies), gl.UNSIGNED_INT, uintptr(0))
 
 	gl.DrawArrays(gl.TRIANGLES, 0, gl.Sizei(monkeymodel.VertexCount))
+}
 
-	attrib_obj_coord.DisableArray()
-	attrib_obj_normal.DisableArray()
-
-
-	//Normals
+func drawnormals() {
+	lineprogram.Use()
+	line_obj_coord.EnableArray()
 
 	nbo.Bind(gl.ARRAY_BUFFER)
-	attrib_obj_coord.AttribPointerInternal(3, gl.FLOAT, false, 0, uintptr(0))
-	attrib_obj_normal.AttribPointerInternal(3, gl.FLOAT, false, 0, uintptr(0))
+	line_obj_coord.AttribPointerInternal(3, gl.FLOAT, false, 0, uintptr(0))
 	gl.DrawArrays(gl.LINES, 0, gl.Sizei(len(monkeynorms)))
 
+	line_obj_coord.DisableArray()	
+}
+
+func draw() {
+	gl.Enable(gl.DEPTH_TEST)
+	gl.ClearColor(0.1, 0.1, 0.1, 1.0)
+	gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+
+	//gl.Enablei(gl.BLEND, 1)
+	//gl.BlendFunc(gl.ONE, gl.ONE)
+	//gl.BlendEquation(0x8006)
+
+	drawnormals()
+	drawmonkey()
+	//Normals
+	
 }
 
 func calc_tick() {
@@ -200,8 +214,11 @@ func calc_tick() {
 	it3x3Model := mt.Inverse().Transpose()
 
 	mvp_tilt = projection.Product(view.Product(mtmp))
+	program.Use()
 	transformattrib.UniformMatrix4fv(1, false, mvp_tilt[:])
 	it3x3attrib.UniformMatrix3fv(1, false, it3x3Model[:])
+	lineprogram.Use()
+	line_transform.UniformMatrix4fv(1, false, mvp_tilt[:])
 }
 
 func calculate_projection() {
@@ -242,7 +259,7 @@ func load_model() (err error) {
 	g := 0
 	for _, v := range monkeymodel.Geometry {
 		monkeynorms[g] = v.Vert
-		monkeynorms[g+1] = obj.GeomVertex{v.Vert[0] + v.Norm[0], v.Vert[1] + v.Norm[1], v.Vert[2] + v.Norm[2]}
+		monkeynorms[g+1] = obj.GeomVertex{v.Vert[0] + v.Norm[0] * 0.1, v.Vert[1] + v.Norm[1] * 0.1, v.Vert[2] + v.Norm[2] * 0.1}
 		g += 2
 	}
 
@@ -278,6 +295,7 @@ func init_vbo() (err error) {
 	vbo = GenBuffer()
 	vbo.Bind(gl.ARRAY_BUFFER)
 	BufferDataCompound(gl.ARRAY_BUFFER, int(monkeymodel.VertexCount)*vertnormSize, monkeymodel.Geometry, gl.STATIC_DRAW)
+
 
 	nbo = GenBuffer()
 	nbo.Bind(gl.ARRAY_BUFFER)
@@ -335,6 +353,41 @@ func init_program() (err error) {
 	if it3x3attrib = program.GetUniformLocation("m_3x3itModel"); it3x3attrib == -1 {
 		fmt.Fprintf(os.Stderr, "Failed to find attribute location \"m_3x3itModel\"\n\t%v\n", program.GetInfoLog())
 		program.Delete()
+		err = errors.New("Attribute not located")
+		return
+	}
+
+	//Line program
+	//Make verrtex shader
+	var linevs Shader
+	if linevs, err = loadshader("line.v.glsl", gl.VERTEX_SHADER); err != nil {
+		return
+	}
+	var linefs Shader
+	if linefs, err = loadshader("line.f.glsl", gl.FRAGMENT_SHADER); err != nil {
+		return
+	}
+	lineprogram = CreateProgram()
+	lineprogram.AttachShader(linevs)
+	lineprogram.AttachShader(linefs)
+	lineprogram.Link()
+
+	if errInt := lineprogram.Get(gl.LINK_STATUS); errInt == 0 {
+		fmt.Fprintf(os.Stderr, "Failed to link: %v\n", lineprogram)
+		lineprogram.Delete()
+		err = errors.New("Failed to link")
+		return
+	}
+
+	if line_obj_coord = lineprogram.GetAttribLocation("obj_coord"); line_obj_coord == -1 {
+		fmt.Fprintf(os.Stderr, "Failed to find attribute location \"obj_coord\"\n\t%v\n", lineprogram.GetInfoLog())
+		lineprogram.Delete()
+		err = errors.New("Attribute not located")
+		return
+	}
+	if line_transform = lineprogram.GetUniformLocation("m_transform"); line_transform == -1 {
+		fmt.Fprintf(os.Stderr, "Failed to find attribute location \"m_transform\"\n\t%v\n", lineprogram.GetInfoLog())
+		lineprogram.Delete()
 		err = errors.New("Attribute not located")
 		return
 	}
