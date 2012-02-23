@@ -57,7 +57,7 @@ var (
 	geomvertexsize int
 	offsetNorm   int
 
-	filename = flag.String("file", "monkey.obj", "Sets the model to render")
+	filename = flag.String("file", "", "Sets the model to render")
 	spinrate = flag.Float64("spin", 4.0, "Sets the spin rate as Pi/x radians per second")
 )
 
@@ -90,6 +90,12 @@ func resize_event(width, height int) {
 func main() {
 	flag.Parse()
 	var err error
+
+
+	if *filename == "" {
+		flag.PrintDefaults()
+		return
+	}
 
 	//Init types
 	vertnormSize = int(unsafe.Sizeof(vertnorm{}))
