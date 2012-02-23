@@ -134,6 +134,7 @@ func main() {
 	//transformattrib.UniformMatrix4fv(1, false, id[:])
 
 	running = true
+	nkeypress := false
 	for running && glfw.WindowParam(glfw.Opened) == 1 {
 		calc_tick()
 		draw()
@@ -141,7 +142,11 @@ func main() {
 		if glfw.Key('Q') == glfw.KeyPress {
 			running = false
 			break
-		}else if (glfw.Key('N') == glfw.KeyPress) {
+		}
+		if nkeypress == false && glfw.Key('N') == glfw.KeyPress{
+			nkeypress = true
+		} else  if nkeypress == true && glfw.Key('N') == glfw.KeyRelease{
+			nkeypress = false
 			normalson = !normalson
 		}
 	}
@@ -260,7 +265,7 @@ func load_model() (err error) {
 	g := 0
 	for _, v := range monkeymodel.Geometry {
 		monkeynorms[g] = v.Vert
-		monkeynorms[g+1] = obj.GeomVertex{v.Vert[0] + v.Norm[0] * 0.1, v.Vert[1] + v.Norm[1] * 0.1, v.Vert[2] + v.Norm[2] * 0.1}
+		monkeynorms[g+1] = obj.GeomVertex{v.Vert[0] + v.Norm[0] * 0.2, v.Vert[1] + v.Norm[1] * 0.2, v.Vert[2] + v.Norm[2] * 0.2}
 		g += 2
 	}
 

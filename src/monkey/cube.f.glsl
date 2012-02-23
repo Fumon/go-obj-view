@@ -19,10 +19,10 @@ struct lightSource
 //
 //);
 lightSource light0 = lightSource(
-  vec4(1.0,  2.0,  6.0, 1.0),
+  vec4(1.0,  0.4,  7.0, 1.0),
   vec4(1.0,  1.0,  1.0, 1.0),
   vec4(1.0,  1.0,  1.0, 1.0),
-  0.0, 0.2, 0.1,
+  0.0, 0.2, 0.05,
   180.0, 0.0,
   vec3(0.0, 0.0, 0.0)
 );
@@ -41,7 +41,7 @@ material monkey = material(
 	);
 
 
-vec4 latent_ambient = vec4(0.1, 0.1, 0.1, 1.0);
+vec4 latent_ambient = vec4(0.01, 0.01, 0.01, 1.0);
 
 void main(void) {
 
