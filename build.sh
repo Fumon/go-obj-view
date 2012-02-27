@@ -1,3 +1,3 @@
 #!/bin/sh
-GOPATH=`pwd`; go install monkey
+GOPATH=`pwd`:$GOROOT; go install monkey
 cp src/monkey/*.glsl bin/

@@ -5,14 +5,14 @@ Requirements:
 
 Go Weekly
 
-[gogl](http://github.com/chsc/gogl)
-Install using:
+Install [gogl](http://github.com/chsc/gogl):
 
 ```bash
 go get 'github.com/chsc/gogl'
 ```
 
-Installation:
+Installation
+----------------
 
 ```bash
 git clone git://github.com/Fumon/go-obj-view.git
@@ -20,7 +20,8 @@ cd go-obj-view
 ./build.sh
 ```
 
-Running:
+Running
+-----------
 
 ```bash
 cd bin
